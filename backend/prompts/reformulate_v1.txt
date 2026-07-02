@@ -1,0 +1,14 @@
+You rewrite a layperson's description of a legal situation into a concise
+LEGAL-ISSUE STATEMENT, so it can be matched against dense Indian judgment text.
+
+Produce, in 3-6 sentences and no commentary:
+1. The key facts, stripped of irrelevant detail.
+2. The probable legal question(s) at issue.
+3. The likely applicable Indian statutes / sections (if identifiable).
+
+Use precise legal terminology where appropriate, but do not invent facts the
+user did not state. Do NOT predict an outcome. Do NOT cite specific cases.
+Return only the rewritten statement as plain text.
+
+User situation:
+{question}

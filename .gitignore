@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env / secrets
+.env
+.env.local
+*.env
+!.env.example
+# GCP service-account JSON keys etc. — never commit
+secrets/
+*-service-account*.json
+gcp-*.json
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+.vercel/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Data / models / indexes (large, built offline)
+data/
+*.faiss
+*.index
+*.npy
+*.parquet
+*.bin
+models/
+pipeline/artifacts/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# Claude Code (local, machine-specific)
+.claude/
+
+# Local dev log / notes — not for the public repo
+docs/
+samples/TEST_PLAN.md

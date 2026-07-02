@@ -1,0 +1,134 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Lenis smooth scroll — keep native scrollbar behaviour predictable. */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+.lenis.lenis-smooth iframe {
+  pointer-events: none;
+}
+
+/* Warm-neutral palette (hue locked warm, à la Harvey). Light = warm paper;
+   dark = warm near-black editorial. Brand/on-brand flip per theme so the
+   primary button is dark-on-cream in light and near-white-on-black in dark. */
+:root {
+  /* Type — Satoshi for headings (consumed by the `font-serif` utility, kept
+     for compatibility with existing call sites) and Cabinet Grotesk for
+     body/subtext (`font-sans`). Both load from Fontshare in layout.tsx. */
+  --font-serif: "Satoshi";
+  --font-sans: "Cabinet Grotesk";
+
+  color-scheme: light;
+  --c-parchment: 244 241 234; /* page bg  #f4f1ea */
+  --c-ink: 26 23 20;          /* text     #1a1714 */
+  --c-surface: 251 250 246;   /* cards    #fbfaf6 */
+  --c-brand: 26 23 20;        /* button   #1a1714 */
+  --c-on-brand: 244 241 234;  /* on btn   #f4f1ea */
+  /* Accent — warm gold (light). Normal luminance: 300 light → 700 dark. */
+  --c-gold-300: 226 201 143;
+  --c-gold-400: 212 173 104;
+  --c-gold-500: 189 145 72;
+  --c-gold-600: 158 118 52;
+  --c-gold-700: 125 93 40;
+}
+
+.dark {
+  color-scheme: dark;
+  /* Neutral black/white/grey (Harvey-style) — no warm tint in dark mode. */
+  --c-parchment: 11 11 12;    /* page bg  #0b0b0c */
+  --c-ink: 237 237 237;       /* text     #ededed */
+  --c-surface: 24 24 26;      /* cards    #18181a */
+  --c-brand: 250 250 250;     /* button   #fafafa */
+  --c-on-brand: 11 11 12;     /* on btn   #0b0b0c */
+  /* Accent — cool muted sage/jade (dark). Luminance inverted so the steps
+     used as text on near-black (600/700) read light, while fills stay mid. */
+  --c-gold-300: 175 196 182;  /* #afc4b6  tints / borders */
+  --c-gold-400: 157 178 163;  /* #9db2a3  icons, fills */
+  --c-gold-500: 157 178 163;  /* #9db2a3  lines, meters, dots */
+  --c-gold-600: 181 200 188;  /* #b5c8bc  eyebrow / accent text */
+  --c-gold-700: 201 214 205;  /* #c9d6cd  badge text (lightest) */
+}
+
+body {
+  @apply bg-parchment text-ink antialiased font-sans;
+  /* Warm wash for light mode only. */
+  background-image:
+    radial-gradient(1200px 600px at 100% -10%, rgba(184, 146, 74, 0.10), transparent 60%),
+    radial-gradient(900px 500px at -10% 0%, rgba(120, 90, 40, 0.05), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Dark mode: drop the amber wash for a neutral, faint white depth cue. */
+.dark body {
+  background-image:
+    radial-gradient(1200px 600px at 100% -10%, rgba(255, 255, 255, 0.04), transparent 60%),
+    radial-gradient(900px 500px at -10% 0%, rgba(255, 255, 255, 0.02), transparent 55%);
+}
+
+/* Indeterminate sliding segment for the route-transition top bar. */
+@keyframes route-bar-slide {
+  0%   { left: -35%; right: 100%; }
+  60%  { left: 100%; right: -10%; }
+  100% { left: 100%; right: -10%; }
+}
+
+/* Infinite horizontal marquee (two copies, shift by -50%). */
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee-x 32s linear infinite;
+}
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee { animation: none; }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-content px-6 lg:px-8;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-3
+      text-sm font-semibold text-onbrand shadow-card ring-1 ring-inset ring-white/10 transition
+      hover:opacity-90 hover:shadow-lift focus:outline-none focus-visible:ring-2
+      focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-parchment
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-ink/15
+      bg-surface/60 px-5 py-3 text-sm font-semibold text-ink transition
+      hover:border-ink/30 hover:bg-surface focus:outline-none focus-visible:ring-2
+      focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-parchment;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-gold-600;
+  }
+
+  .card {
+    @apply rounded-2xl border border-ink/10 bg-surface/80 p-6 shadow-card backdrop-blur-sm;
+  }
+
+  .hairline {
+    @apply border-ink/10;
+  }
+}
