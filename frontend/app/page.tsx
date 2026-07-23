@@ -53,7 +53,7 @@ const CAPABILITIES: {
 ];
 
 const STEPS = [
-  { n: "01", t: "Describe", d: "Tell us what happened in plain words, or attach a document." },
+  { n: "01", t: "Describe", d: "Tell us your issue, or attach a document." },
   { n: "02", t: "We match", d: "We pull the Supreme Court cases closest to yours." },
   { n: "03", t: "Where you stand", d: "A clear read on your position, and the factors that help or hurt." },
   { n: "04", t: "What to do", d: "Practical next steps, with every cited case real and checkable." },
@@ -64,7 +64,6 @@ export default function Home() {
     <>
       <Nav />
 
-      {/* ------------------------------- Hero ------------------------------- */}
       <section className="relative overflow-hidden">
         <div className="container-page flex min-h-[100svh] flex-col items-center justify-center gap-7 pb-24 pt-32 text-center lg:pb-28 lg:pt-36">
           <Reveal className="eyebrow">
@@ -102,7 +101,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* --------------------------- Capabilities --------------------------- */}
       <section id="capabilities" className="container-page py-20">
         <Reveal className="max-w-2xl">
           <span className="eyebrow"><GoldLine />What you can do</span>
@@ -138,10 +136,8 @@ export default function Home() {
         </Stagger>
       </section>
 
-      {/* ----------------------------- Dashboard demo ----------------------- */}
       <DashboardDemo />
 
-      {/* ----------------------------- How it works ------------------------- */}
       <section id="how" className="border-y border-ink/10 bg-navy-950 text-cream">
         <div className="container-page py-20">
           <Reveal className="max-w-2xl">
@@ -162,7 +158,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ----------------------------- Marquee ------------------------------ */}
       <section className="border-y border-ink/10 bg-surface/40 py-5">
         <div className="container-page mb-3">
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink/40">
@@ -172,7 +167,6 @@ export default function Home() {
         <Marquee items={PRACTICE_AREAS} />
       </section>
 
-      {/* ------------------------------ Method ------------------------------ */}
       <section id="method" className="container-page py-20">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <Reveal>
@@ -189,7 +183,7 @@ export default function Home() {
               {[
                 ["Past cases", "How the most similar decided cases actually came out."],
                 ["A trained model", "A model trained on thousands of past judgments to spot the likely outcome."],
-                ["AI reasoning", "A careful read of the retrieved judgments, explained in plain words."],
+                ["AI reasoning", "A careful read of the retrieved judgments, clearly explained."],
               ].map(([t, d]) => (
                 <StaggerItem key={t} className="flex gap-3">
                   <span className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-navy-900 text-gold-400">
@@ -228,7 +222,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------------------------- CTA + legal --------------------------- */}
       <section className="container-page pb-8">
         <Reveal className="overflow-hidden rounded-3xl bg-navy-950 px-8 py-12 text-center text-cream shadow-lift sm:px-16">
           <h2 className="mx-auto max-w-2xl font-serif text-3xl font-semibold tracking-tight sm:text-4xl">

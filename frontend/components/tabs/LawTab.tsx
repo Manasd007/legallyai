@@ -9,10 +9,6 @@ import { CopyButton } from "@/components/CopyButton";
 import { postJson } from "@/components/api";
 import type { StoredMessage } from "@/components/tabs/types";
 
-/* "Find the law" tab — governing Acts/sections for a situation. Single-shot
-   form; shares the session matter and its own thread (tool="statutes").
-   Extracted from the old /statutes page. */
-
 type Statute = { act: string; section: string; what_it_governs: string; relevance: string };
 type Related = {
   case_name: string;
@@ -37,7 +33,6 @@ const EXAMPLES = [
   "A company failed to deliver goods I paid for in advance.",
 ];
 
-/** Restore the most recent statutes result (and its question) from history. */
 function hydrate(messages: StoredMessage[]): { question: string; res: Result | null } {
   let question = "";
   let res: Result | null = null;
@@ -45,7 +40,7 @@ function hydrate(messages: StoredMessage[]): { question: string; res: Result | n
     const m = messages[i];
     if (m.role === "assistant" && m.payload && Array.isArray(m.payload.statutes)) {
       res = m.payload as Result;
-      // The user turn just before this assistant turn is the asked question.
+
       const prev = messages[i - 1];
       if (prev?.role === "user") question = prev.content;
     }
@@ -61,7 +56,6 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
   const [res, setRes] = useState<Result | null>(seed.res);
   const [error, setError] = useState<string | null>(null);
 
-  // Carry the matter in from another tab: prefill once when empty.
   useEffect(() => {
     if (matter && question.trim() === "" && !res) setQuestion(matter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,11 +82,10 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="w-full">
       <p className="max-w-2xl text-sm leading-relaxed text-ink/65">
-        Describe what happened in plain words. We&apos;ll point you to the Indian laws most
-        likely to apply, explain what each one means in everyday language, and show real
-        Supreme Court cases that have used them.
+        Describe your situation. We&apos;ll point you to the Indian laws most likely to apply,
+        explain what each one means, and show real Supreme Court cases that have applied them.
       </p>
 
       {!res && !loading && (

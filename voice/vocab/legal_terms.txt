@@ -1,0 +1,301 @@
+# Legally AI Voice boosted legal vocabulary (context doc §4.3b).
+#
+# Two kinds of lines:
+#   1. `term` alone            → sent to Deepgram as a keyword/keyterm boost so
+#                                the STT model favors it during decoding.
+#   2. `wrong => Right Phrase` → transcript-repair substitution applied after
+#                                STT (server/llm/transcript_repair.py).
+# Lines starting with # are comments. Keep this list curated (~200 terms);
+# boosting everything boosts nothing.
+
+# ── Acts ─────────────────────────────────────────────────────
+Indian Penal Code
+IPC
+Bharatiya Nyaya Sanhita
+CrPC
+Code of Criminal Procedure
+Bharatiya Nagarik Suraksha Sanhita
+CPC
+Code of Civil Procedure
+Indian Evidence Act
+Bharatiya Sakshya Adhiniyam
+Negotiable Instruments Act
+NI Act
+Hindu Marriage Act
+Special Marriage Act
+Hindu Succession Act
+Muslim Personal Law
+Indian Contract Act
+Transfer of Property Act
+Specific Relief Act
+Limitation Act
+Arbitration and Conciliation Act
+Consumer Protection Act
+Motor Vehicles Act
+Rent Control Act
+Domestic Violence Act
+Dowry Prohibition Act
+POCSO Act
+NDPS Act
+Prevention of Corruption Act
+Information Technology Act
+SARFAESI Act
+Insolvency and Bankruptcy Code
+Companies Act
+Income Tax Act
+GST Act
+Land Acquisition Act
+RERA
+Juvenile Justice Act
+SC ST Atrocities Act
+Armed Forces Special Powers Act
+UAPA
+PMLA
+Essential Commodities Act
+Industrial Disputes Act
+Payment of Wages Act
+Minimum Wages Act
+Employees Provident Fund Act
+Gratuity Act
+Maternity Benefit Act
+Right to Information Act
+Environment Protection Act
+
+# ── Frequently spoken sections ───────────────────────────────
+Section 138
+Section 420
+Section 498A
+Section 304B
+Section 302
+Section 307
+Section 376
+Section 354
+Section 375
+Section 323
+Section 406
+Section 409
+Section 120B
+Section 34
+Section 149
+Section 306
+Section 279
+Section 337
+Section 338
+Section 174A
+Section 41A
+Section 91
+Section 125 CrPC
+Section 156
+Section 161
+Section 164
+Section 173
+Section 200
+Section 202
+Section 204
+Section 313
+Section 319
+Section 320
+Section 397
+Section 401
+Section 438
+Section 439
+Section 482
+Section 9 Hindu Marriage Act
+Section 13 Hindu Marriage Act
+Section 24 Hindu Marriage Act
+Section 80 CPC
+Order 39
+Article 14
+Article 19
+Article 21
+Article 32
+Article 136
+Article 226
+Article 227
+
+# ── Court & procedure terms ──────────────────────────────────
+Supreme Court
+High Court
+Sessions Court
+Magistrate
+Judicial Magistrate First Class
+District Court
+Tribunal
+NCLT
+NCLAT
+NCDRC
+State Commission
+District Forum
+Lok Adalat
+FIR
+chargesheet
+cognizable offence
+non-cognizable offence
+bailable offence
+non-bailable offence
+anticipatory bail
+regular bail
+interim bail
+default bail
+remand
+custody
+judicial custody
+police custody
+summons
+warrant
+non-bailable warrant
+proclaimed offender
+quashing
+discharge
+acquittal
+conviction
+sentence
+probation
+parole
+appeal
+revision
+review petition
+curative petition
+special leave petition
+SLP
+writ petition
+habeas corpus
+mandamus
+certiorari
+quo warranto
+public interest litigation
+PIL
+injunction
+interim relief
+stay order
+status quo
+ex parte
+caveat
+affidavit
+vakalatnama
+plaint
+written statement
+petition
+respondent
+petitioner
+appellant
+plaintiff
+defendant
+accused
+complainant
+witness
+cross examination
+evidence
+exhibit
+decree
+judgment
+ratio decidendi
+obiter dicta
+precedent
+limitation period
+condonation of delay
+maintainability
+jurisdiction
+cause of action
+res judicata
+locus standi
+
+# ── Subject-matter terms ─────────────────────────────────────
+cheque bounce
+cheque dishonour
+legal notice
+demand notice
+promissory note
+loan recovery
+money suit
+breach of contract
+damages
+compensation
+specific performance
+arbitration clause
+security deposit
+rent agreement
+lease deed
+eviction
+tenant
+landlord
+sale deed
+gift deed
+will
+probate
+succession certificate
+legal heir
+partition suit
+ancestral property
+mutation
+encroachment
+adverse possession
+power of attorney
+registration
+stamp duty
+maintenance
+alimony
+divorce
+mutual consent divorce
+judicial separation
+restitution of conjugal rights
+custody of child
+guardianship
+adoption
+domestic violence
+dowry
+dowry harassment
+streedhan
+cruelty
+desertion
+bigamy
+defamation
+cyber crime
+identity theft
+consumer complaint
+deficiency in service
+unfair trade practice
+medical negligence
+motor accident claim
+hit and run
+insurance claim
+third party insurance
+workmen compensation
+wrongful termination
+notice period
+full and final settlement
+sexual harassment at workplace
+gratuity
+provident fund
+
+# ── Repair substitutions (wrong => right) ────────────────────
+# STT frequently renders these wrongly in code-switched speech.
+check bounce => cheque bounce
+check dishonor => cheque dishonour
+check dishonour => cheque dishonour
+anticipatory bell => anticipatory bail
+regular bell => regular bail
+interim bell => interim bail
+default bell => default bail
+bell application => bail application
+bell bond => bail bond
+four ninety eight a => 498A
+four nine eight a => 498A
+one twenty b => 120B
+ipc four twenty => IPC Section 420
+sarfesi => SARFAESI
+sarfaesi act => SARFAESI Act
+rera act => RERA
+pokso => POCSO
+nclt tribunal => NCLT
+res judicata => res judicata
+vakalat nama => vakalatnama
+lok adalat => Lok Adalat
+suo moto => suo motu
+suo motto => suo motu
+habeus corpus => habeas corpus
+habeas corpes => habeas corpus
+slp petition => special leave petition
+moter accident => motor accident
+striidhan => streedhan
+stri dhan => streedhan

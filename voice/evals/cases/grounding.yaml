@@ -1,0 +1,20 @@
+# Grounding cases (context doc §6.1): the agent must call legal_search and its
+# answer must not name cases that were never retrieved. `must_mention_any`
+# checks topical grounding loosely (spoken answers paraphrase, so we check
+# concepts, not exact strings).
+- id: cheque-bounce-basics
+  question: "Mera cheque bounce ho gaya hai, Section 138 ke under kya karna hoga?"
+  expect_tool_call: true
+  must_mention_any: ["notice", "138", "cheque"]
+- id: security-deposit
+  question: "Makaan malik security deposit wapas nahi de raha, kya kar sakta hoon?"
+  expect_tool_call: true
+  must_mention_any: ["deposit", "notice", "landlord", "makaan"]
+- id: anticipatory-bail
+  question: "Mere against FIR ho gayi hai 498A mein, anticipatory bail kaise milegi?"
+  expect_tool_call: true
+  must_mention_any: ["bail", "438", "court"]
+- id: consumer-defect
+  question: "Naya phone kharab nikla aur company replace nahi kar rahi. Consumer court ja sakta hoon?"
+  expect_tool_call: true
+  must_mention_any: ["consumer", "complaint", "refund", "replace"]

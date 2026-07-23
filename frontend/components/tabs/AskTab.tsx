@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Mic } from "lucide-react";
 import { ArrowIcon, ScalesIcon, ChatIcon } from "@/components/ui";
 import { useSession } from "@/components/session";
 import { CitedCase as CitedCaseCard, TrustBadge } from "@/components/CitedCase";
 import { postJson } from "@/components/api";
+import { useVoiceSession, voiceEnabled, type CallResult } from "@/components/voice/useVoiceSession";
+import { VoiceBar } from "@/components/voice/VoiceBar";
+import { LiveTurns } from "@/components/voice/LiveTurns";
+import { VoiceSummary } from "@/components/VoiceSummary";
 import type { StoredMessage } from "@/components/tabs/types";
-
-/* "Ask a question" tab — conversational RAG over the corpus. Shares the session's
-   matter and its own backend thread (tool="assistant"). Extracted from the old
-   /assistant page; chrome and cross-tool handoff removed (tabs replace them). */
 
 type Cited = {
   case_name: string;
@@ -21,7 +22,14 @@ type Cited = {
   segment_role?: string;
   excerpt?: string;
 };
-type Msg = { role: "user" | "assistant"; content: string; cases?: Cited[]; weak?: boolean };
+type Msg = {
+  role: "user" | "assistant";
+  content: string;
+  cases?: Cited[];
+  weak?: boolean;
+
+  voiceCitations?: string[];
+};
 
 const STARTERS = [
   "Can an employer dismiss an employee without an inquiry?",
@@ -30,7 +38,6 @@ const STARTERS = [
   "Is anticipatory bail available for economic offences?",
 ];
 
-/** Rebuild the chat from stored messages when a past session is opened. */
 function hydrate(messages: StoredMessage[]): Msg[] {
   return messages.map((m) =>
     m.role === "user"
@@ -40,6 +47,7 @@ function hydrate(messages: StoredMessage[]): Msg[] {
           content: m.content,
           cases: m.payload?.cited_cases,
           weak: m.payload?.weak_retrieval,
+          voiceCitations: m.payload?.voice_citations,
         },
   );
 }
@@ -52,6 +60,8 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const botAudioRef = useRef<HTMLAudioElement>(null);
+  const voice = useVoiceSession({ onComplete: (r) => absorbCall(r) });
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -59,7 +69,7 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
 
   async function ask(question: string) {
     if (!question.trim() || loading) return;
-    // The opening question defines the matter; follow-ups don't overwrite it.
+
     if (messages.length === 0) setSituation(question);
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
     setMessages((m) => [...m, { role: "user", content: question }]);
@@ -87,25 +97,86 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
     }
   }
 
-  return (
-    <div className="mx-auto max-w-3xl">
-      <p className="max-w-2xl text-sm leading-relaxed text-ink/65">
-        Ask in plain words and get answers grounded in real Supreme Court cases. Every answer
-        shows the cases it relied on, and follow-up questions remember what you asked before.
-      </p>
+  async function absorbCall({ summary, citations, firstQuestion }: CallResult) {
+    const question = firstQuestion || "Voice consultation";
+    if (messages.length === 0) setSituation(question);
+    setMessages((m) => [
+      ...m,
+      { role: "user", content: question },
+      { role: "assistant", content: summary, voiceCitations: citations },
+    ]);
+    try {
+      const data = await postJson<{ conversation_id?: string }>(
+        "/api/voice/record",
+        attach("assistant", { question, summary, citations, tool: "assistant" }),
+      );
+      commitConv("assistant", data.conversation_id);
+    } catch {}
+  }
 
-      {messages.length === 0 ? (
-        <div className="mt-8 card flex flex-col items-center py-12 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-navy-900 text-gold-400">
-            <ChatIcon className="h-6 w-6" />
+  const voiceIdle = voice.phase === "idle";
+
+  const composer = voiceIdle ? (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        ask(input);
+      }}
+      className="flex items-center gap-2 rounded-xl border border-ink/15 bg-surface/80 px-2 py-1.5 shadow-card backdrop-blur"
+    >
+      <input
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder="Ask a legal question…"
+        className="flex-1 bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-ink/40"
+      />
+      {voiceEnabled && (
+        <button
+          type="button"
+          onClick={() => voice.start(botAudioRef.current)}
+          title="Talk instead of typing"
+          aria-label="Start a voice conversation"
+          className="rounded-lg p-2 text-ink/50 transition hover:bg-ink/5 hover:text-ink"
+        >
+          <Mic className="h-4 w-4" strokeWidth={1.8} aria-hidden />
+        </button>
+      )}
+      <button type="submit" disabled={loading || !input.trim()} className="btn-primary px-3 py-2">
+        <ArrowIcon className="h-4 w-4" />
+      </button>
+    </form>
+  ) : (
+    <VoiceBar
+      phase={voice.phase}
+      status={voice.status}
+      level={voice.level}
+      agentSpeaking={voice.agentSpeaking}
+      onStop={voice.stop}
+      onCancel={voice.cancel}
+    />
+  );
+
+  return (
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      {messages.length === 0 && voiceIdle ? (
+        <div className="flex flex-1 flex-col justify-center py-8">
+          <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-navy-900 text-gold-400">
+            <ChatIcon className="h-5 w-5" />
           </span>
-          <p className="mt-4 font-serif text-lg font-semibold text-ink">Start the conversation</p>
-          <p className="mt-1 text-sm text-ink/55">Pick a question or type your own below.</p>
+          <h2 className="mt-4 text-center font-serif text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+            What would you like to know?
+          </h2>
+          <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-relaxed text-ink/60">
+            Every answer shows the Supreme Court cases it relied on, and follow-ups remember
+            what you asked before.
+          </p>
+
+          <div className="mt-6">{composer}</div>
 
           {matter && (
             <button
               onClick={() => ask(matter)}
-              className="mt-5 max-w-md rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-2.5 text-left text-sm text-ink/80 transition hover:border-gold-500/50"
+              className="mt-4 w-full rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-2.5 text-left text-sm text-ink/80 transition hover:border-gold-500/50"
             >
               <span className="block text-[11px] font-semibold uppercase tracking-wider text-gold-700">
                 Continue your matter
@@ -121,43 +192,36 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
                 onClick={() => ask(q)}
                 className="rounded-full border border-ink/15 bg-surface/60 px-3.5 py-1.5 text-left text-xs text-ink/70 transition hover:border-ink/30 hover:text-ink"
               >
-                {q}
+                {q.length > 52 ? q.slice(0, 52) + "…" : q}
               </button>
             ))}
           </div>
         </div>
       ) : (
-        <div className="mt-8 space-y-4">
-          {messages.map((m, i) => (
-            <MessageBubble key={i} msg={m} />
-          ))}
-          {loading && <Thinking />}
-          <div ref={endRef} />
-        </div>
+        <>
+
+          <div className="flex-1 space-y-4 pb-4">
+            {messages.map((m, i) => (
+              <MessageBubble key={i} msg={m} />
+            ))}
+            {loading && <Thinking />}
+
+            <LiveTurns turns={voice.turns} />
+            <div ref={endRef} />
+          </div>
+          <div className="sticky bottom-4 pt-2">{composer}</div>
+        </>
       )}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          ask(input);
-        }}
-        className="sticky bottom-4 mt-6 flex items-center gap-2 rounded-xl border border-ink/15 bg-surface/80 px-2 py-1.5 shadow-card backdrop-blur"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask a legal question…"
-          className="flex-1 bg-transparent px-2 py-2 text-sm text-ink outline-none placeholder:text-ink/40"
-        />
-        <button type="submit" disabled={loading || !input.trim()} className="btn-primary px-3 py-2">
-          <ArrowIcon className="h-4 w-4" />
-        </button>
-      </form>
+      <audio ref={botAudioRef} autoPlay />
     </div>
   );
 }
 
 function MessageBubble({ msg }: { msg: Msg }) {
+  if (msg.role === "assistant" && msg.voiceCitations) {
+    return <VoiceSummary content={msg.content} citations={msg.voiceCitations} />;
+  }
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">

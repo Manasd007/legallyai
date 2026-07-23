@@ -1,0 +1,18 @@
+# Context cases (context doc §6.4): multi-turn scripts where turn 2+ refers
+# back with pronouns. Pass = the follow-up turn's tool query (or answer) carries
+# the referenced entity, proving state survived the turn boundary.
+- id: deposit-followup
+  turns:
+    - "Landlord mera 50000 ka security deposit nahi de raha."
+    - "Aur agar woh notice ka jawab nahi de toh?"
+  followup_must_carry_any: ["deposit", "landlord", "rent", "tenant"]
+- id: section-reference
+  turns:
+    - "Section 138 cheque bounce mein kitna time limit hota hai notice ka?"
+    - "Uske baad court mein kya hota hai?"
+  followup_must_carry_any: ["138", "cheque", "notice"]
+- id: bail-followup
+  turns:
+    - "Bhai ko police ne pakda hai theft case mein, bail kaise hogi?"
+    - "Usmein kitna time lagta hai?"
+  followup_must_carry_any: ["bail", "theft", "arrest"]

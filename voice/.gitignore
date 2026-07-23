@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+data/telemetry/
+evals/fixtures/audio/*.wav
+evals/fixtures/audio/*.mp3
+.pytest_cache/
+
+# Internal docs — not for the tracked repo (README.md is kept)
+PROJECT_CONTEXT.md
+CHANGELOG.md
+evals/fixtures/audio/README.md

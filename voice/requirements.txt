@@ -1,0 +1,10 @@
+# Legally AI Voice server dependencies. Zero-budget stack (context doc §8):
+# Deepgram free credit, Groq free tier, everything else open source.
+pipecat-ai[webrtc,silero,deepgram,groq]~=1.5
+edge-tts  # keyless Microsoft neural voices — only zero-budget native Hindi TTS
+fastapi
+uvicorn[standard]
+httpx
+pydantic-settings
+python-dotenv
+pyyaml

@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Mic } from "lucide-react";
 import { ArrowIcon, ScalesIcon, DocIcon } from "@/components/ui";
 import { useSession } from "@/components/session";
+import { useVoiceSession, voiceEnabled, type CallResult } from "@/components/voice/useVoiceSession";
+import { VoiceBar } from "@/components/voice/VoiceBar";
+import { LiveTurns } from "@/components/voice/LiveTurns";
+import { VoiceSummary } from "@/components/VoiceSummary";
 import { FadeUp, MotionBar } from "@/components/motion";
 import { CopyButton } from "@/components/CopyButton";
 import { CitedCase as CitedCaseCard, TrustBadge } from "@/components/CitedCase";
 import { postJson, readJsonResponse, authHeaders } from "@/components/api";
 import { DocAnalysisView, type Analysis } from "@/components/DocAnalysis";
 import type { StoredMessage } from "@/components/tabs/types";
-
-/* "Assess a case" tab — describe a situation or attach a document, get a
-   precedent-grounded prediction, then keep chatting. Shares the session matter
-   and its own backend thread (created as tool="predict" or "documents").
-   Extracted from the old /predict page. */
 
 type Source = {
   court?: string;
@@ -96,17 +96,17 @@ type Item =
   | { id: number; role: "assistant"; kind: "prediction"; data: QueryResponse }
   | { id: number; role: "assistant"; kind: "doc"; analysis: Analysis }
   | { id: number; role: "assistant"; kind: "text"; content: string; cases?: ChatCited[]; weak?: boolean }
+
+  | { id: number; role: "assistant"; kind: "voice"; content: string; citations: string[] }
   | { id: number; role: "assistant"; kind: "error"; content: string };
 
 const ACCEPT = ".pdf,.docx,.txt,.md,.png,.jpg,.jpeg,.webp,.bmp,.tiff,.gif";
 const MAX_BYTES = 10 * 1024 * 1024;
 
-/** Tell a stored prediction payload from a document-analysis payload. */
 function isDocPayload(p: any): boolean {
   return !!p && typeof p.doc_id === "string" && (p.summary !== undefined || p.suggested_questions !== undefined);
 }
 
-/** Rebuild the assessment thread from stored messages when a session is opened. */
 function hydrate(messages: StoredMessage[], nextId: () => number): { items: Item[]; docId: string | null; predicted: boolean } {
   const items: Item[] = [];
   let docId: string | null = null;
@@ -123,6 +123,14 @@ function hydrate(messages: StoredMessage[], nextId: () => number): { items: Item
     } else if (isDocPayload(p)) {
       items.push({ id: nextId(), role: "assistant", kind: "doc", analysis: p as Analysis });
       docId = p.doc_id;
+    } else if (p?.source === "voice") {
+      items.push({
+        id: nextId(),
+        role: "assistant",
+        kind: "voice",
+        content: m.content,
+        citations: p.voice_citations || [],
+      });
     } else {
       items.push({
         id: nextId(),
@@ -157,10 +165,11 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
   const seededMatter = useRef(seed.items.length > 0);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const botAudioRef = useRef<HTMLAudioElement>(null);
+  const voice = useVoiceSession({ onComplete: (r) => absorbCall(r) });
 
   const push = (it: Item) => setItems((cur) => [...cur, it]);
 
-  // Carry the matter in from another tab: prefill the composer once.
   useEffect(() => {
     if (matter && input.trim() === "" && items.length === 0) setInput(matter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,8 +197,7 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
     const fd = new FormData();
     fd.append("file", file);
     fd.append("session_id", sessionId);
-    // Multipart upload: don't set Content-Type (the browser adds the boundary),
-    // but still send the auth header so the upload lands in the user's history.
+
     const r = await fetch("/api/doc/analyze", {
       method: "POST",
       headers: { ...(await authHeaders()) },
@@ -200,6 +208,25 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
     return analysis;
   }
 
+  const FULL_ASSESSMENT_RE =
+    /\b(?:full|complete|detailed|proper|whole)\s+(?:case\s+)?(?:assessment|analysis|report|evaluation|breakdown)\b|\b(?:run|give|do|show)\s+(?:me\s+)?(?:the|a|an)?\s*(?:full\s+)?assessment\b|\bassess\s+(?:my|the|this)\s+(?:case|matter|situation)\b/i;
+
+  function assessmentContext(): string {
+    const parts: string[] = [];
+    if (matter) parts.push(matter.trim());
+    for (const it of items) {
+      if (it.role === "user") {
+        const t = it.text.trim();
+
+        if (t && !FULL_ASSESSMENT_RE.test(t)) parts.push(t);
+      } else if (it.kind === "voice") {
+        parts.push(it.content.trim());
+      }
+    }
+
+    return Array.from(new Set(parts.filter(Boolean))).join("\n\n");
+  }
+
   function textHistory() {
     return items
       .filter((it) => it.role === "user" || (it.role === "assistant" && it.kind === "text"))
@@ -208,6 +235,39 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
           ? { role: "user", content: it.text }
           : { role: "assistant", content: (it as Extract<Item, { kind: "text" }>).content },
       );
+  }
+
+  async function runFullAssessment() {
+    if (loading) return;
+    const question = assessmentContext();
+    if (!question) {
+      push({
+        id: nextId(),
+        role: "assistant",
+        kind: "error",
+        content: "Tell me what happened first, then I can run the full assessment.",
+      });
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await postJson<QueryResponse & { conversation_id?: string }>(
+        "/api/query",
+        attach("predict", { question }),
+      );
+      commitConv("predict", data.conversation_id);
+      push({ id: nextId(), role: "assistant", kind: "prediction", data });
+      setPredicted(true);
+    } catch (e) {
+      push({
+        id: nextId(),
+        role: "assistant",
+        kind: "error",
+        content: e instanceof Error ? e.message : "Request failed. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function send() {
@@ -223,6 +283,12 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
     }
     setInput("");
     setPendingFile(null);
+
+    if (text && !file && !firstUserTurn && FULL_ASSESSMENT_RE.test(text)) {
+      await runFullAssessment();
+      return;
+    }
+
     setLoading(true);
     try {
       if (file) {
@@ -319,6 +385,23 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
     }
   }
 
+  async function absorbCall({ summary, citations, firstQuestion }: CallResult) {
+    const question = firstQuestion || "Voice consultation";
+    push({ id: nextId(), role: "user", text: question });
+    push({ id: nextId(), role: "assistant", kind: "voice", content: summary, citations });
+    if (!seededMatter.current) {
+      setSituation(question);
+      seededMatter.current = true;
+    }
+    try {
+      const d = await postJson<{ conversation_id?: string }>(
+        "/api/voice/record",
+        attach("predict", { question, summary, citations, tool: "predict" }),
+      );
+      commitConv("predict", d.conversation_id);
+    } catch {}
+  }
+
   async function askDoc(useDocId: string, question: string) {
     if (loading || !question.trim()) return;
     push({ id: nextId(), role: "user", text: question });
@@ -349,56 +432,98 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
     setInput("");
     setPendingFile(null);
     seededMatter.current = false;
-    resetConv("predict"); // next turn starts a fresh assessment thread in this session
+    resetConv("predict");
   }
 
+  const voiceIdle = voice.phase === "idle";
   const empty = items.length === 0;
+
+  const offerAssessmentOn = (() => {
+    for (let i = items.length - 1; i >= 0; i -= 1) {
+      const it = items[i];
+      if (it.role !== "assistant") continue;
+      if (it.kind === "prediction") return null;
+      if (it.kind === "voice") return it.id;
+    }
+    return null;
+  })();
   const latestDoc = [...items]
     .reverse()
     .find((it): it is Extract<Item, { kind: "doc" }> => it.role === "assistant" && it.kind === "doc");
 
+  const composer = voiceIdle ? (
+    <Composer
+      input={input}
+      setInput={setInput}
+      pendingFile={pendingFile}
+      onPick={pickFile}
+      onClearFile={() => setPendingFile(null)}
+      onSend={send}
+      onVoice={() => voice.start(botAudioRef.current)}
+      loading={loading}
+      fileRef={fileRef}
+    />
+  ) : (
+    <VoiceBar
+      phase={voice.phase}
+      status={voice.status}
+      level={voice.level}
+      agentSpeaking={voice.agentSpeaking}
+      onStop={voice.stop}
+      onCancel={voice.cancel}
+    />
+  );
+
+  const zeroState = empty && voiceIdle;
+
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-14rem)] max-w-3xl flex-col">
-      {!empty && (
-        <div className="flex justify-end">
-          <button onClick={startOver} className="btn-ghost shrink-0 px-3 py-2 text-xs">
-            Start over
-          </button>
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      {zeroState ? (
+        <div className="flex flex-1 flex-col justify-center py-8">
+          <Intro
+            matter={matter ?? undefined}
+            onExample={(ex) => setInput(ex)}
+            onUseMatter={() => matter && setInput(matter)}
+            composer={composer}
+          />
         </div>
-      )}
-
-      {empty ? (
-        <Intro matter={matter ?? undefined} onExample={(ex) => setInput(ex)} onUseMatter={() => matter && setInput(matter)} />
       ) : (
-        <div className="mt-2 flex-1 space-y-6">
-          {items.map((it) => (
-            <Row key={it.id} item={it} />
-          ))}
-          {!loading && latestDoc && (
-            <DocFollowUp analysis={latestDoc.analysis} onAssess={assessDoc} onAsk={askDoc} />
-          )}
-          {loading && <Thinking />}
-          <div ref={endRef} />
-        </div>
+        <>
+          <div className="flex justify-end">
+            <button onClick={startOver} className="btn-ghost shrink-0 px-3 py-2 text-xs">
+              Start over
+            </button>
+          </div>
+
+          <div className="mt-2 flex-1 space-y-6 pb-4">
+            {items.map((it) => (
+              <Row
+                key={it.id}
+                item={it}
+
+                onFullAssessment={
+                  it.id === offerAssessmentOn && !loading ? runFullAssessment : undefined
+                }
+              />
+            ))}
+            {!loading && latestDoc && (
+              <DocFollowUp analysis={latestDoc.analysis} onAssess={assessDoc} onAsk={askDoc} />
+            )}
+            {loading && <Thinking />}
+
+            <LiveTurns turns={voice.turns} />
+            <div ref={endRef} />
+          </div>
+          <div className="sticky bottom-4 pt-2">{composer}</div>
+        </>
       )}
 
-      <Composer
-        input={input}
-        setInput={setInput}
-        pendingFile={pendingFile}
-        onPick={pickFile}
-        onClearFile={() => setPendingFile(null)}
-        onSend={send}
-        loading={loading}
-        fileRef={fileRef}
-      />
+      <audio ref={botAudioRef} autoPlay />
     </div>
   );
 }
 
-/* ------------------------------- Thread rows ------------------------------ */
-
-function Row({ item }: { item: Item }) {
+function Row({ item, onFullAssessment }: { item: Item; onFullAssessment?: () => void }) {
   if (item.role === "user") return <UserBubble text={item.text} fileName={item.fileName} />;
   if (item.kind === "prediction")
     return (
@@ -410,6 +535,16 @@ function Row({ item }: { item: Item }) {
     return (
       <FadeUp>
         <DocAnalysisView analysis={item.analysis} />
+      </FadeUp>
+    );
+  if (item.kind === "voice")
+    return (
+      <FadeUp>
+        <VoiceSummary
+          content={item.content}
+          citations={item.citations}
+          onFullAssessment={onFullAssessment}
+        />
       </FadeUp>
     );
   if (item.kind === "error")
@@ -517,24 +652,29 @@ function Intro({
   matter,
   onExample,
   onUseMatter,
+  composer,
 }: {
   matter?: string;
   onExample: (ex: string) => void;
   onUseMatter: () => void;
+  composer: React.ReactNode;
 }) {
   return (
-    <div className="space-y-6">
-      <p className="max-w-2xl text-sm leading-relaxed text-ink/65">
-        Tell us what happened in plain words and we&apos;ll tell you where you likely stand, what
-        helps and hurts, and what to do next, grounded in how real Supreme Court cases were decided.
-        Or attach a contract, notice, or order (even a scan or photo) and we&apos;ll read it, break
-        it down, and answer your questions about it.
+    <div>
+      <h2 className="text-center font-serif text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        What happened?
+      </h2>
+      <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-relaxed text-ink/60">
+        Describe your situation and we&apos;ll tell you where you likely stand, grounded in how
+        real Supreme Court cases were decided. Or attach a contract, notice, or order.
       </p>
+
+      <div className="mt-6">{composer}</div>
 
       {matter && (
         <button
           onClick={onUseMatter}
-          className="block w-full max-w-2xl rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-3 text-left text-sm transition hover:border-gold-500/50"
+          className="mt-4 block w-full rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-3 text-left text-sm transition hover:border-gold-500/50"
         >
           <span className="block text-[11px] font-semibold uppercase tracking-wider text-gold-700">
             Continue your matter
@@ -543,19 +683,16 @@ function Intro({
         </button>
       )}
 
-      <div>
-        <p className="mb-2 text-xs font-medium uppercase tracking-wider text-ink/45">Try an example</p>
-        <div className="flex flex-wrap gap-2">
-          {EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              onClick={() => onExample(ex)}
-              className="rounded-full border border-ink/15 bg-surface/60 px-3.5 py-1.5 text-left text-xs text-ink/65 transition hover:border-ink/30 hover:text-ink"
-            >
-              {ex.length > 60 ? ex.slice(0, 60) + "…" : ex}
-            </button>
-          ))}
-        </div>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {EXAMPLES.map((ex) => (
+          <button
+            key={ex}
+            onClick={() => onExample(ex)}
+            className="rounded-full border border-ink/15 bg-surface/60 px-3.5 py-1.5 text-left text-xs text-ink/65 transition hover:border-ink/30 hover:text-ink"
+          >
+            {ex.length > 52 ? ex.slice(0, 52) + "…" : ex}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -568,6 +705,7 @@ function Composer({
   onPick,
   onClearFile,
   onSend,
+  onVoice,
   loading,
   fileRef,
 }: {
@@ -577,6 +715,7 @@ function Composer({
   onPick: (f: File | undefined) => void;
   onClearFile: () => void;
   onSend: () => void;
+  onVoice: () => void;
   loading: boolean;
   fileRef: React.RefObject<HTMLInputElement>;
 }) {
@@ -591,7 +730,7 @@ function Composer({
   }, [input]);
 
   return (
-    <div className="sticky bottom-4 mt-6">
+    <div>
       <div className="group relative">
         <div
           aria-hidden
@@ -651,6 +790,17 @@ function Composer({
               placeholder="Describe your situation, attach a document, or ask a question…"
               className="min-h-[36px] flex-1 resize-none self-center bg-transparent px-1 py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-ink/40 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             />
+            {voiceEnabled && (
+              <button
+                type="button"
+                onClick={onVoice}
+                aria-label="Start a voice conversation"
+                title="Talk instead of typing"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink/45 transition hover:bg-ink/[0.06] hover:text-gold-600"
+              >
+                <Mic className="h-5 w-5" strokeWidth={1.8} aria-hidden />
+              </button>
+            )}
             <button
               onClick={onSend}
               disabled={!canSend}
@@ -700,8 +850,6 @@ function Thinking() {
     </div>
   );
 }
-
-/* ------------------------------- Result view ------------------------------ */
 
 function Result({ res }: { res: QueryResponse }) {
   if (res.category === "not_legal") {
@@ -798,8 +946,6 @@ function Result({ res }: { res: QueryResponse }) {
     </section>
   );
 }
-
-/* ------------------------- Plain-language verdict ------------------------- */
 
 type Stance = { word: string; headline: string; tone: "good" | "neutral" | "bad" };
 
@@ -908,8 +1054,6 @@ function VerdictCard({
     </div>
   );
 }
-
-/* --------------------------- Strong & weak points ------------------------- */
 
 const ASSESSMENT_META: Record<Factor["assessment"], { tag: string; rail: string; chip: string; iconWrap: string }> = {
   favorable: {
@@ -1021,8 +1165,6 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
   );
 }
 
-/* ------------------------------- Next steps ------------------------------- */
-
 function NextSteps({ steps }: { steps: string[] }) {
   return (
     <div className="card border border-gold-500/30 bg-gold-400/[0.06]">
@@ -1043,8 +1185,6 @@ function NextSteps({ steps }: { steps: string[] }) {
     </div>
   );
 }
-
-/* --------------------------- Analogous precedent -------------------------- */
 
 function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> }) {
   return (
@@ -1087,8 +1227,6 @@ function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> 
     </div>
   );
 }
-
-/* ------------------------ Methodology (opt-in detail) --------------------- */
 
 function MethodDisclosure({ ps }: { ps: Signals }) {
   const pv = ps.precedent_vote;
@@ -1140,8 +1278,6 @@ function MethodDisclosure({ ps }: { ps: Signals }) {
   );
 }
 
-/* -------------------------------- Out of scope ---------------------------- */
-
 function OutOfScope({ res }: { res: QueryResponse }) {
   return (
     <section className="space-y-4">
@@ -1177,8 +1313,6 @@ function OutOfScope({ res }: { res: QueryResponse }) {
     </section>
   );
 }
-
-/* --------------------------------- Misc ----------------------------------- */
 
 function Notice({ children }: { children: React.ReactNode }) {
   return <div className="card text-ink/75">{children}</div>;

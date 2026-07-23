@@ -12,10 +12,6 @@ import { AskTab } from "@/components/tabs/AskTab";
 import { LawTab } from "@/components/tabs/LawTab";
 import type { StoredMessage } from "@/components/tabs/types";
 
-/* The workspace is one tabbed surface per session. The three features share the
-   session's matter and each keep their own backend thread. Opening a past
-   session (?session=<id>) rehydrates every tab from stored messages. */
-
 type TabKey = "assess" | "ask" | "law";
 
 const TABS: { key: TabKey; label: string; sub: string; icon: typeof ScalesIcon }[] = [
@@ -24,7 +20,6 @@ const TABS: { key: TabKey; label: string; sub: string; icon: typeof ScalesIcon }
   { key: "law", label: "Find the law", sub: "Acts & sections", icon: BookIcon },
 ];
 
-// Which conversation tool feeds which tab (a thread's `tool` is set by its first turn).
 const TOOL_TO_TAB: Record<string, TabKey> = {
   predict: "assess",
   documents: "assess",
@@ -78,8 +73,6 @@ function Workspace() {
   const [hydrated, setHydrated] = useState<Hydrated | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Rehydrate when a past session is opened from history. Skip if it's already
-  // the active in-memory session (e.g. navigating back to your own live work).
   useEffect(() => {
     if (!sessionParam || sessionParam === hydrated?.sessionId) return;
     if (sessionParam === sessionId && hydrated) return;
@@ -95,11 +88,11 @@ function Workspace() {
           const tab = TOOL_TO_TAB[c.tool];
           if (!tab) continue;
           messages[tab] = messages[tab].concat(c.messages || []);
-          // The provider thread key mirrors the tab (assess → "predict").
+
           const toolKey: Tool = tab === "assess" ? "predict" : tab === "ask" ? "assistant" : "statutes";
           conv[toolKey] = c.id;
         }
-        // Keep each tab's messages in chronological order across merged threads.
+
         (Object.keys(messages) as TabKey[]).forEach((k) =>
           messages[k].sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
         );
@@ -127,8 +120,6 @@ function Workspace() {
 
   if (!ready) return <ShellLoader />;
 
-  // When opening a past session, wait for its data before mounting the tabs so
-  // each tab seeds its state from the stored messages exactly once.
   const awaitingSession = !!sessionParam && hydrated?.sessionId !== sessionParam;
 
   const initial = (tab: TabKey): StoredMessage[] | undefined =>
@@ -136,15 +127,16 @@ function Workspace() {
 
   return (
     <WorkspaceShell>
-      <main className="container-page max-w-5xl py-8">
-        {/* Session header */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
+
+      <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-6 lg:px-8">
+
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="eyebrow">
               <span className="h-px w-6 bg-gold-500" />
               Session
             </span>
-            <h1 className="mt-2 line-clamp-2 max-w-2xl font-serif text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+            <h1 className="mt-1.5 line-clamp-1 font-serif text-lg font-semibold tracking-tight text-ink sm:text-xl">
               {matter || "New session"}
             </h1>
           </div>
@@ -153,8 +145,7 @@ function Workspace() {
           </button>
         </div>
 
-        {/* Tab bar */}
-        <div role="tablist" aria-label="Workspace tools" className="mt-6 flex flex-wrap gap-1.5 border-b border-ink/10">
+        <div role="tablist" aria-label="Workspace tools" className="mt-4 flex flex-wrap gap-1.5 border-b border-ink/10">
           {TABS.map((t) => {
             const Icon = t.icon;
             const on = active === t.key;
@@ -177,25 +168,24 @@ function Workspace() {
           })}
         </div>
 
-        {/* Tab panels — kept mounted so in-progress work survives tab switches. */}
-        <div className="mt-8">
+        <div className="mt-6 flex min-h-0 flex-1 flex-col">
           {awaitingSession ? (
             loadError ? (
               <div className="card text-sm text-ink/70">{loadError}</div>
             ) : (
-              <div className="grid place-items-center py-24">
+              <div className="grid flex-1 place-items-center">
                 <BrandLoader label="Opening your session…" />
               </div>
             )
           ) : (
-            <div key={sessionId}>
-              <div hidden={active !== "assess"}>
+            <div key={sessionId} className="flex min-h-0 flex-1 flex-col">
+              <div className={active === "assess" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
                 <AssessTab initialMessages={initial("assess")} />
               </div>
-              <div hidden={active !== "ask"}>
+              <div className={active === "ask" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
                 <AskTab initialMessages={initial("ask")} />
               </div>
-              <div hidden={active !== "law"}>
+              <div className={active === "law" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
                 <LawTab initialMessages={initial("law")} />
               </div>
             </div>

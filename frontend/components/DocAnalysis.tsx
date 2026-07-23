@@ -5,11 +5,6 @@ import { DocIcon, ShieldCheckIcon } from "@/components/ui";
 import { BrandLoader } from "@/components/BrandLoader";
 import { postJson } from "@/components/api";
 
-/* Shared document-analysis view. Renders the structured, advice-first breakdown
-   the backend returns from /api/doc/analyze. Used inside the merged Predictor
-   thread (and previously the standalone Documents page). Chat over the document
-   is handled by the surrounding thread, not here. */
-
 export type Party = { name: string; role: string };
 export type KeyDate = { label: string; date: string };
 export type KeyPoint = { heading: string; detail: string };
@@ -375,7 +370,7 @@ function LegalTerms({ docId, glossary }: { docId: string; glossary: Term[] }) {
     <div className="card">
       <h2 className="font-serif text-lg font-semibold text-ink">Legal terms, explained</h2>
       <p className="mt-1 text-xs text-ink/55">
-        Legal papers are full of jargon. Tap a term, or ask about any word, in plain English.
+        Legal papers are full of jargon. Tap a term, or ask about any word in the document.
       </p>
 
       <dl className="mt-4 space-y-3">

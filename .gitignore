@@ -53,3 +53,7 @@ Thumbs.db
 # Local dev log / notes — not for the public repo
 docs/
 samples/TEST_PLAN.md
+
+# Demo / marketing scripts — kept locally, not for the public repo
+legally-ai-loom-script*.docx
+legally-ai-loom-script*.txt

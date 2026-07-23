@@ -1,0 +1,8 @@
+# Keep the build context to what the service actually runs.
+.venv/
+**/__pycache__/
+**/*.pyc
+.env
+data/
+evals/
+*.md

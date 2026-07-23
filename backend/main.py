@@ -10,16 +10,9 @@ Designed to degrade gracefully:
 """
 from __future__ import annotations
 
-# PyTorch and FAISS each link their own OpenMP runtime; on Windows this trips
-# "OMP: Error #15 ... multiple copies of the OpenMP runtime" and aborts the
-# process. Allow the duplicate runtime BEFORE torch/faiss are imported. Must be
-# the first thing we do. (For a permanent fix, build/install torch+faiss against
-# a single OpenMP, but this is the supported workaround.)
 import os
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
-# Quieten the HF/transformers startup noise (token nag + weight-load reports);
-# loading InLegalBERT as a base encoder legitimately drops its MLM head.
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
@@ -55,7 +48,7 @@ log = logging.getLogger("legally.main")
 app = FastAPI(title="Legally AI", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten to the Vercel domain before deploy
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -99,7 +92,6 @@ def _warmup_models() -> None:
     threading.Thread(target=_load, name="model-warmup", daemon=True).start()
 
 
-# ── Auth (Supabase JWT) ──────────────────────────────────────
 import functools
 
 
@@ -111,7 +103,7 @@ def _jwks_client():
     RS256) and publish the public half here. PyJWKClient fetches + caches them
     and picks the right key by the token's `kid`.
     """
-    import jwt  # PyJWT
+    import jwt
 
     url = get_settings().supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json"
     return jwt.PyJWKClient(url)
@@ -136,14 +128,11 @@ def get_user_id(authorization: str | None = Header(default=None)) -> str:
     if not token:
         return "dev-user"
     try:
-        import jwt  # PyJWT
+        import jwt
 
-        # A little leeway absorbs minor clock skew between this server and
-        # Supabase (a token's `iat` can look a few seconds in the future).
         leeway = 60
         alg = jwt.get_unverified_header(token).get("alg", "")
         if alg in ("ES256", "RS256", "EdDSA"):
-            # Asymmetric: verify with the project's public key for this token.
             signing_key = _jwks_client().get_signing_key_from_jwt(token).key
             claims = jwt.decode(
                 token, signing_key, algorithms=[alg], audience="authenticated", leeway=leeway
@@ -155,8 +144,6 @@ def get_user_id(authorization: str | None = Header(default=None)) -> str:
                     token, secret, algorithms=["HS256"], audience="authenticated", leeway=leeway
                 )
             else:
-                # No secret and no public key path: read claims unverified so the
-                # history layer still works in local dev, but don't trust the id.
                 log.warning("SUPABASE_JWT_SECRET not set — accepting JWT without verification.")
                 claims = jwt.decode(token, options={"verify_signature": False})
         return claims.get("sub") or "dev-user"
@@ -165,9 +152,6 @@ def get_user_id(authorization: str | None = Header(default=None)) -> str:
         return "dev-user"
 
 
-# ── Schemas ──────────────────────────────────────────────────
-# `conversation_id` continues an existing history thread; omit it (null) to start
-# a new one. Every answer echoes the id back so the client can keep appending.
 class QueryBody(BaseModel):
     question: str
     conversation_id: str | None = None
@@ -176,7 +160,7 @@ class QueryBody(BaseModel):
 
 class FeedbackBody(BaseModel):
     prediction_id: str
-    rating: int  # +1 / -1
+    rating: int
     note: str | None = None
 
 
@@ -210,14 +194,27 @@ class CaseBody(BaseModel):
     highlight_id: str = ""
 
 
-# ── Routes ───────────────────────────────────────────────────
+class VoiceCallBody(BaseModel):
+    """A finished voice call, handed over by the frontend for persistence.
+
+    The call itself runs in the separate `voice/` service, which has no Supabase
+    credentials and no notion of the caller's identity — the browser holds both,
+    so it relays the finished call here to be filed under the user's session."""
+
+    question: str
+    summary: str
+    citations: list[str] = []
+    tool: str = "assistant"
+    conversation_id: str | None = None
+    session_id: str | None = None
+
+
 @app.get("/api/health")
 def health() -> dict:
     s = get_settings()
     return {"status": "ok", "corpus": s.corpus_date_range, "backend": s.vector_backend}
 
 
-# ── Document analysis (upload → analyze → chat) ──────────────
 @app.post("/api/doc/analyze")
 async def doc_analyze_route(
     file: UploadFile = File(...),
@@ -258,7 +255,6 @@ async def doc_analyze_route(
         **analysis,
         "disclaimer": s.disclaimer,
     }
-    # Open a "documents" thread for this upload so it shows in history (best-effort).
     response["conversation_id"] = db.record_turn(
         user_id=user_id,
         conversation_id=None,
@@ -309,7 +305,6 @@ def doc_term_route(body: DocTermBody) -> dict:
     return {"term": body.term, "explanation": explanation}
 
 
-# ── Full case view (provenance deep-dive) ───────────────────
 @app.post("/api/case")
 def case_route(body: CaseBody) -> dict:
     """Return a full judgment reconstructed from its chunks, with the cited chunk
@@ -325,7 +320,6 @@ def case_route(body: CaseBody) -> dict:
     return case
 
 
-# ── Legal Q&A assistant (conversational RAG over the corpus) ──
 @app.post("/api/chat")
 def legal_chat_route(body: ChatBody, user_id: str = Depends(get_user_id)) -> dict:
     """Answer a free-form legal question conversationally, grounded in cases
@@ -347,7 +341,6 @@ def legal_chat_route(body: ChatBody, user_id: str = Depends(get_user_id)) -> dic
     return {**result, "conversation_id": conversation_id, "disclaimer": get_settings().disclaimer}
 
 
-# ── Statute & Section Finder ─────────────────────────────────
 @app.post("/api/statutes")
 def statutes_route(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
     """Identify governing Acts/sections for a situation, linked to retrieved cases."""
@@ -365,6 +358,29 @@ def statutes_route(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict
         session_id=body.session_id,
     )
     return {**result, "conversation_id": conversation_id, "disclaimer": get_settings().disclaimer}
+
+
+@app.post("/api/voice/record")
+def voice_record_route(body: VoiceCallBody, user_id: str = Depends(get_user_id)) -> dict:
+    """File a finished voice call into the thread of the tab it was started from.
+
+    A call and a typed question are the same conversation about the same matter,
+    so the summary belongs inline in that tab's history rather than in a separate
+    silo — and filing it under the originating tool is what makes it rehydrate
+    where the user saw it. No model runs here; the voice service already wrote
+    the summary."""
+    tool = body.tool if body.tool in ("assistant", "predict", "statutes") else "assistant"
+    payload = {"source": "voice", "voice_citations": body.citations}
+    conversation_id = db.record_turn(
+        user_id=user_id,
+        conversation_id=body.conversation_id,
+        tool=tool,
+        user_text=body.question or "Voice consultation",
+        assistant_text=body.summary,
+        payload=payload,
+        session_id=body.session_id,
+    )
+    return {"conversation_id": conversation_id}
 
 
 @app.post("/api/retrieve")
@@ -390,15 +406,10 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
     if not question:
         raise HTTPException(status_code=400, detail="question is required")
 
-    # 1) Intake router (brief §6.1)
     route = router_mod.classify(question)
     category = route["category"]
 
     if category == "not_legal":
-        # Greetings / chit-chat / off-topic: keep it short and human, like a chat
-        # assistant — no web search, no long detour. Steer back to legal help.
-        # Not saved to history (nothing substantive to revisit), but we still echo
-        # the thread id so a stray greeting mid-conversation doesn't drop it.
         return {
             "category": "not_legal",
             "conversation_id": body.conversation_id,
@@ -432,12 +443,8 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
         )
         return gl
 
-    # 2) Reformulate (brief §6.2)
     reformulated = reformulate_mod.reformulate(question)
 
-    # cache check (brief §16). The cache is global across users, so we still
-    # record *this* user's turn before returning, and spread a copy so we never
-    # write one user's conversation_id into the shared cached object.
     cached = cache.get(reformulated)
     if cached:
         conversation_id = db.record_turn(
@@ -451,22 +458,16 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
         )
         return {**cached, "conversation_id": conversation_id}
 
-    # 3) Retrieve (brief §6.3)
     try:
         result = retrieval_mod.retrieve(reformulated, question)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    # 4) Predict + explain (brief §6.4)
     prediction = predict_mod.predict(reformulated, question, result)
     prediction["_model_version"] = predict_mod.MODEL_VERSION
 
-    # 5) Verify citations + weak-retrieval hedge (brief §6.5)
     prediction = verify_mod.verify(prediction, result)
 
-    # 5b) Win/lose (1/0) ensemble (brief §2, §10): blend the precedent vote,
-    # the LLM forecast and (if trained) the PredEx classifier, judging
-    # confidence by how much the independent signals agree.
     precedent = ensemble_mod.precedent_vote(result)
     clf = classifier_mod.predict_win(reformulated)
     combined = ensemble_mod.combine(
@@ -484,11 +485,9 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
         **combined,
     }
 
-    # If retrieval was weak (verify hedged), don't let the ensemble overclaim.
     if prediction["verification"].get("hedged"):
         prediction_signals["confidence"] = "low"
 
-    # 6) Persist (best-effort) (brief §6.6)
     case_id = db.persist_query(user_id=user_id, raw_text=question, prediction=prediction)
 
     response = {
@@ -526,7 +525,6 @@ def history(user_id: str = Depends(get_user_id)) -> dict:
     return {"cases": db.list_history(user_id)}
 
 
-# ── Conversation history (the returning-user "chat sections") ─
 @app.get("/api/conversations")
 def conversations(user_id: str = Depends(get_user_id)) -> dict:
     """Sidebar list of the caller's past threads, most-recently-active first."""
@@ -542,7 +540,6 @@ def conversation_detail(conversation_id: str, user_id: str = Depends(get_user_id
     return thread
 
 
-# ── Sessions (workspace-level grouping of the per-tool threads) ───────────────
 @app.get("/api/sessions")
 def sessions(user_id: str = Depends(get_user_id)) -> dict:
     """Sidebar list of the caller's workspace sessions, most-recently-active first."""
