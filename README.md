@@ -1,7 +1,7 @@
 # Legally AI
 
 **A precedent-grounded legal assistant for Indian law.** Describe a legal situation in plain
-words — or upload a contract, notice, or court order — and get an assessment of where you
+words - or upload a contract, notice, or court order - and get an assessment of where you
 stand, grounded in how real Supreme Court judgments were decided, with **every citation
 verified against the indexed corpus** so nothing is invented.
 
@@ -14,19 +14,19 @@ verified against the indexed corpus** so nothing is invented.
 ### ⚖️ Case assessment with a win/lose estimate
 Describe what happened and get a plain-language read on your position: how likely the claim
 is to succeed, **which facts help or hurt you** (each tied to a precedent-grounded reason),
-and **concrete steps that would strengthen the case** — not just a probability, a strategy.
+and **concrete steps that would strengthen the case** - not just a probability, a strategy.
 
-### 🔍 Every citation is real — and provable
+### 🔍 Every citation is real - and provable
 The industry's biggest credibility problem is AI-invented case law. Here, every case the
 model cites is checked against the retrieved corpus; anything unverifiable is stripped.
 Each citation expands to the **verbatim source passage** from the actual judgment, and one
 click opens the **full judgment with the relied-upon passage highlighted in context**.
 
 ### 📄 Document analysis with OCR
-Upload a PDF, DOCX, image, or scan (handwriting included — OCR runs through a vision LLM,
+Upload a PDF, DOCX, image, or scan (handwriting included - OCR runs through a vision LLM,
 no Tesseract). The analyzer returns where you stand, deadlines with urgency levels, amounts,
 obligations, risks, recommended actions, and an auto-extracted **plain-English glossary** of
-the legal jargon found in the document. Then chat with the document — answers are grounded
+the legal jargon found in the document. Then chat with the document - answers are grounded
 only in its text and cite the specific clause.
 
 ### 💬 Legal Q&A with cited answers
@@ -35,13 +35,13 @@ lists the judgments it relied on, and a per-turn intake classifier keeps greetin
 meta-questions from triggering bogus retrieval.
 
 ### 📚 Statute finder
-From a plain-language situation to the governing Acts and sections — each explained in
+From a plain-language situation to the governing Acts and sections - each explained in
 everyday language and linked to real judgments that applied it. The model is forbidden from
 fabricating section numbers: it prefers provisions that appear in the retrieved cases.
 
 ### 🎙 Talk to it instead of typing
 A mic button in the composer opens a real-time voice conversation in Hindi, English or
-Hinglish — interruptible, grounded in the same judgments, answering out loud. Hang up and
+Hinglish - interruptible, grounded in the same judgments, answering out loud. Hang up and
 the written summary with citations lands in the chat you were already having, so the
 matter carries straight on in text.
 
@@ -61,7 +61,7 @@ scores its own confidence by how much the signals *agree*:
 |---|---|
 | **Precedent vote** | Similarity-weighted vote over the *real recorded outcomes* of the most analogous retrieved cases |
 | **Trained classifier** | InLegalBERT fine-tuned on PredEx (10.9k labeled Indian judgments) for binary applicant-wins prediction |
-| **LLM forecast** | A grounded reasoning pass over the retrieved judgments — allowed to abstain |
+| **LLM forecast** | A grounded reasoning pass over the retrieved judgments - allowed to abstain |
 
 The signals are blended into a final probability, and confidence is set by **agreement**:
 all three point the same way → high; two of three → medium; divergence, abstention, or weak
@@ -69,7 +69,7 @@ retrieval → low, stated explicitly. When the system isn't sure, it says so ins
 sounding sure.
 
 **Classifier evaluation** (held-out PredEx test split, n=1,217): accuracy **0.610**,
-macro-F1 **0.605** — at the ceiling of the realistic band for a 512-token encoder on this
+macro-F1 **0.605** - at the ceiling of the realistic band for a 512-token encoder on this
 benchmark, and independently confirmed by a cross-dataset retrain on NyayaAnumana. The
 ensemble design means no single weak signal can overclaim.
 
@@ -93,7 +93,7 @@ AWS Open Data SC judgments                     Next.js frontend (Vercel)
 ```
 
 - **Corpus:** 1,991 Indian Supreme Court judgments (2015–2024, CC-BY-4.0), chunked into
-  88,988 role-tagged passages. Ratio/Holding segments are up-weighted — they carry the
+  88,988 role-tagged passages. Ratio/Holding segments are up-weighted - they carry the
   decided outcome.
 - **Artifacts on Hugging Face Hub**, version-pinned: the backend downloads the index and
   classifier on first boot ([corpus index](https://huggingface.co/datasets/ManasDubey/legally-ai-corpus-index) ·
@@ -101,16 +101,16 @@ AWS Open Data SC judgments                     Next.js frontend (Vercel)
   expansion is a one-env-var bump (`CORPUS_REVISION=v2`), no code change.
 - **LLM routing** through LiteLLM: fast Llama on Groq for the router/reformulator, a larger
   Groq model for grounded reasoning, with configurable fallback. All model IDs live in env
-  config — free tiers change, logic doesn't.
+  config - free tiers change, logic doesn't.
 - **Prompt-injection defense** on uploads: untrusted-document delimiters with sanitization,
   a server-side injection heuristic, and prompts that treat document text as inert data.
-- **Voice is a third process**, not a third module. A fully streaming Pipecat pipeline —
+- **Voice is a third process**, not a third module. A fully streaming Pipecat pipeline -
   `mic → Deepgram Nova-3 STT → transcript repair → Silero VAD + Hinglish-adaptive endpointing
-  → Groq Llama (tool: legal_search → POST /api/retrieve) → Edge TTS → speaker` — runs a
+  → Groq Llama (tool: legal_search → POST /api/retrieve) → Edge TTS → speaker` - runs a
   real-time, interruptible conversation in Hindi, English or Hinglish under a **≤800 ms P50 /
   ≤1200 ms P95 end-to-end** budget, with per-turn P50/P95 telemetry. Those deadlines mean it
   can't share a core with FAISS + InLegalBERT, and its sticky WebRTC connections don't fit the
-  backend's stateless horizontal scaling. It calls `/api/retrieve` rather than `/api/chat` —
+  backend's stateless horizontal scaling. It calls `/api/retrieve` rather than `/api/chat` -
   retrieval returns raw chunks with no nested LLM call, so the voice model composes the spoken
   answer itself instead of paying a second round-trip mid-sentence. On hang-up it posts a
   written summary with verified citations to `/api/voice/record`, which files it into the tab's
@@ -139,14 +139,14 @@ AWS Open Data SC judgments                     Next.js frontend (Vercel)
 | `POST /api/doc/analyze` | Upload + extract (OCR fallback) + advisory breakdown |
 | `POST /api/doc/chat` · `/api/doc/term` | Document-grounded chat and term explanations |
 | `POST /api/case` | Full judgment reconstruction with the cited passage flagged |
-| `POST /api/retrieve` | Raw reformulate + retrieve, no prediction — the seam the voice service calls |
+| `POST /api/retrieve` | Raw reformulate + retrieve, no prediction - the seam the voice service calls |
 | `POST /api/voice/record` | File a finished voice call into the session's Q&A thread |
 | `GET/POST /api/sessions*` | Per-user session history (Supabase-backed) |
 
 The voice service runs its own API on port 7860 (`POST /api/offer` for WebRTC signalling,
 `WS /ws/events/{session}` for live transcript, `POST /api/summary/{session}` for the post-call
 summary, plus `GET /api/health` and `GET /api/metrics` for readiness and P50/P95 latency). The
-browser reaches it directly — Next.js rewrites don't proxy WebSockets.
+browser reaches it directly - Next.js rewrites don't proxy WebSockets.
 
 ---
 
@@ -172,7 +172,7 @@ cp .env.local.example .env.local                  # Supabase public keys (option
 npm run dev
 ```
 
-**Voice** (optional — the mic button hides itself if `NEXT_PUBLIC_VOICE_URL` is unset):
+**Voice** (optional - the mic button hides itself if `NEXT_PUBLIC_VOICE_URL` is unset):
 ```bash
 cd voice
 python -m venv .venv && .venv/Scripts/pip install -r requirements.txt
@@ -187,10 +187,10 @@ memory. It reaches the backend over `RAG_BASE_URL` and needs the frontend origin
 ## Repository layout
 
 ```
-backend/     FastAPI app — retrieval, ensemble, verification, docs, Q&A, statutes
+backend/     FastAPI app - retrieval, ensemble, verification, docs, Q&A, statutes
   prompts/   versioned prompt templates (system/user split, grounding rules)
-frontend/    Next.js app — landing page + tabbed workspace
-voice/       Legally AI Voice — real-time Hinglish voice agent (Pipecat/WebRTC), own process
+frontend/    Next.js app - landing page + tabbed workspace
+voice/       Legally AI Voice - real-time Hinglish voice agent (Pipecat/WebRTC), own process
 pipeline/    offline: corpus download, chunk/embed/index, classifier training + eval
 sql/         Supabase schema (row-level security)
 huggingface/ README cards for the hosted artifacts
