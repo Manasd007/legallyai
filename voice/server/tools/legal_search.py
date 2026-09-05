@@ -1,18 +1,3 @@
-"""Client for the existing Legally AI RAG endpoint, exposed to the voice LLM
-as the `legal_search` tool.
-
-Design (context doc §2, §8):
-  * The RAG backend is an EXISTING service — we integrate, never rebuild.
-  * We call POST /api/retrieve (reformulate + FAISS retrieve, no prediction):
-    it returns raw chunks without a nested LLM call, which keeps the tool
-    round-trip inside the latency budget and lets the voice LLM compose the
-    spoken answer itself.
-  * Every call has a hard timeout and a machine-readable failure shape so the
-    pipeline can SPEAK a recovery line instead of leaving dead air (§4.8).
-  * Results are compacted (top-N chunks, excerpts capped) before they reach the
-    LLM so the token budget — and therefore time-to-first-sentence — stays flat
-    (§4.9).
-"""
 from __future__ import annotations
 
 import logging
@@ -25,8 +10,6 @@ from server.config import get_settings
 
 log = logging.getLogger("legallyai.voice.legal_search")
 
-# One persistent client per process: connection reuse shaves the TCP+TLS
-# handshake off every tool call (context doc §3 "warm connections").
 _client: httpx.AsyncClient | None = None
 
 
@@ -49,8 +32,6 @@ async def close_client() -> None:
 
 
 def _compact_chunk(raw: dict, excerpt_chars: int) -> dict:
-    """Trim a retrieved chunk to what the LLM actually needs to ground a spoken
-    answer. Full text stays available in the post-call summary via chunk_id."""
     text = str(raw.get("chunk_text", "")).strip()
     return {
         "case_name": raw.get("case_name", ""),
@@ -65,13 +46,6 @@ def _compact_chunk(raw: dict, excerpt_chars: int) -> dict:
 
 
 async def legal_search(query: str) -> dict[str, Any]:
-    """Retrieve Supreme Court passages relevant to `query`.
-
-    Returns a dict the LLM can ground on:
-      ok=True  → {ok, cases, weak_retrieval, max_similarity, latency_ms}
-      ok=False → {ok, error, latency_ms}  (the LLM must tell the user retrieval
-                 failed and offer to retry — never invent an answer)
-    """
     s = get_settings()
     started = time.perf_counter()
     try:

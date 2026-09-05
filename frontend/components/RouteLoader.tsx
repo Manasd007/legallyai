@@ -5,36 +5,27 @@ import { useEffect, useRef, useState } from "react";
 import { BrandLoader } from "@/components/BrandLoader";
 import { useScrollLock } from "@/components/scrollLock";
 
-/* Smooth feedback for client-side navigations (switching workspace tools, etc.).
- App Router gives no transition events, so we start on an internal link click and
- finish when the pathname actually changes, i.e. when the next route is ready.
- A slim gold top bar always shows; a subtle branded overlay only appears if the
- navigation takes a beat, and stays a touch longer so it never flickers. */
 
-const OVERLAY_DELAY = 170; // ms before the centered loader appears
-const MIN_OVERLAY = 360; // ms it stays once shown, to avoid a flash
-const SAFETY = 12000; // ms hard stop if a navigation never resolves
+const OVERLAY_DELAY = 170;
+const MIN_OVERLAY = 360;
+const SAFETY = 12000;
 
 export function RouteLoader() {
  const pathname = usePathname();
- const [active, setActive] = useState(false); // top bar
- const [overlay, setOverlay] = useState(false); // centered loader
+ const [active, setActive] = useState(false);
+ const [overlay, setOverlay] = useState(false);
  const startedAt = useRef(0);
  const delayT = useRef<ReturnType<typeof setTimeout>>();
  const minT = useRef<ReturnType<typeof setTimeout>>();
  const safetyT = useRef<ReturnType<typeof setTimeout>>();
 
- // While the centered overlay is up, freeze the page so a slow navigation can't
- // be scrolled behind the loader.
  useScrollLock(overlay);
 
- // Finish whenever the route resolves.
  useEffect(() => {
  finish();
  // eslint-disable-next-line react-hooks/exhaustive-deps
  }, [pathname]);
 
- // Begin on a left-click of an internal link.
  useEffect(() => {
  function onClick(e: MouseEvent) {
  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
@@ -44,10 +35,9 @@ export function RouteLoader() {
  const href = a.getAttribute("href");
  const target = a.getAttribute("target");
  if (!href || (target && target !== "_self")) return;
- // Only same-app, non-anchor navigations.
  if (!href.startsWith("/") || href.startsWith("//")) return;
  const dest = href.split("#")[0];
- if (!dest || dest === pathname) return; // same page / pure hash
+ if (!dest || dest === pathname) return;
  begin();
  }
  document.addEventListener("click", onClick, true);
@@ -70,7 +60,6 @@ export function RouteLoader() {
  const shownFor = Date.now() - startedAt.current;
  setOverlay((wasShown) => {
  if (wasShown) {
- // keep it up a touch so it reads as intentional, not a flicker
  minT.current = setTimeout(() => setOverlay(false), Math.max(0, MIN_OVERLAY - shownFor));
  return true;
  }
@@ -88,7 +77,6 @@ export function RouteLoader() {
 
  return (
  <>
- {/* Top progress bar */}
  <div
  aria-hidden
  className={`pointer-events-none fixed inset-x-0 top-0 z-[100] h-[3px] transition-opacity duration-300 ${
@@ -103,7 +91,6 @@ export function RouteLoader() {
  </div>
  </div>
 
- {/* Subtle branded overlay for longer transitions */}
  <div
  aria-hidden={!overlay}
  className={`fixed inset-0 z-[99] grid place-items-center transition-opacity duration-300 ${
@@ -112,7 +99,7 @@ export function RouteLoader() {
  style={{ visibility: overlay ? "visible" : "hidden" }}
  >
  <div className="absolute inset-0 bg-parchment/45 backdrop-blur-[2px]" />
- <div className="relative rounded-2xl border border-ink/10 bg-surface/85 px-8 py-7 shadow-lift">
+ <div className="relative rounded border-2 border-ink bg-surface/80 px-8 py-7 shadow-brutal-lg backdrop-blur-md">
  <BrandLoader label="One moment…" size="sm" />
  </div>
  </div>

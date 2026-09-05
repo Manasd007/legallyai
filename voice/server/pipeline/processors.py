@@ -1,20 +1,3 @@
-"""Custom frame processors for the Legally AI Voice pipeline.
-
-Placement in the pipeline (see builder.py):
-
-    transport.input() → stt → [TranscriptRepairProcessor] → user_aggregator
-        → llm → tts → [GeneratedTextTracker] → transport.output()
-        → [DeliveredTextTracker] → assistant_aggregator
-
-  * TranscriptRepairProcessor — fixes legal-term mis-transcriptions on final
-    transcripts before they reach retrieval (context doc §4.3) and feeds the
-    live transcript panel.
-  * GeneratedTextTracker — accumulates what the LLM/TTS produced this turn.
-  * DeliveredTextTracker — accumulates what actually made it through the output
-    transport (≈ what the user heard) and, on interruption, tells the hub how
-    much of the answer was cut off (§4.2). Sitting downstream of the output
-    transport is what makes the delivered/generated distinction real.
-"""
 from __future__ import annotations
 
 import logging
@@ -48,7 +31,6 @@ class TranscriptRepairProcessor(FrameProcessor):
         await super().process_frame(frame, direction)
         if isinstance(frame, TranscriptionFrame) and frame.text:
             frame.text = repair(frame.text)
-            # Finals only: interim results carry unstable language guesses.
             self._hub.note_detected_language(frame.language)
             self._hub.user_final(frame.text)
         elif isinstance(frame, InterimTranscriptionFrame) and frame.text:
@@ -59,17 +41,6 @@ class TranscriptRepairProcessor(FrameProcessor):
 
 
 class FunctionCallMarkupFilter(FrameProcessor):
-    """Sits between llm and tts. Small Llama models sometimes write tool calls
-    as literal text — `<function=legal_search>{...}</function>` — instead of
-    using the function-calling interface. Left alone, TTS reads that JSON aloud
-    and it lands in the transcript. This filter removes it from the streaming
-    text without adding latency to clean text:
-
-      * complete markup blocks are dropped as soon as their closer arrives;
-      * a suspicious tail (possible opener prefix, e.g. "<fun") is withheld
-        until disambiguated;
-      * at end-of-response any unterminated markup is dropped outright.
-    """
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -92,7 +63,7 @@ class FunctionCallMarkupFilter(FrameProcessor):
             else:
                 await self._emit(self._buffer[:hold], direction)
                 self._buffer = self._buffer[hold:]
-            return  # original frame replaced by the filtered ones
+            return
 
         if isinstance(frame, LLMFullResponseEndFrame):
             await self._emit(strip_tool_markup(self._buffer), direction)

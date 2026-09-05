@@ -1,18 +1,3 @@
-"""Pipeline observer that turns frame traffic into per-stage latency numbers
-(context doc §3: every turn logs per-stage timings from day one).
-
-An observer sees every frame pushed anywhere in the pipeline without sitting in
-the data path, so instrumentation adds nothing to the latency it measures.
-
-Stage timing model per turn:
-
-    VADUserStoppedSpeaking ─┐
-                            ├─ endpoint_ms (silence → turn-over decision)
-    UserStoppedSpeaking ────┘
-    FunctionCallInProgress → FunctionCallResult   = tool_ms (wall clock)
-    BotStartedSpeaking (output transport)         → e2e_ms since VAD stop
-    MetricsFrame TTFB entries                     → llm_first_ms / tts_first_ms
-"""
 from __future__ import annotations
 
 import logging
@@ -38,10 +23,10 @@ class TurnTelemetryObserver(BaseObserver):
     def __init__(self, hub: SessionHub, **kwargs) -> None:
         super().__init__(**kwargs)
         self._hub = hub
-        self._seen: set[int] = set()  # frame ids, since frames pass many processors
+        self._seen: set[int] = set()
         self._t_vad_stop: float | None = None
         self._t_turn_stop: float | None = None
-        self._tool_started: dict[str, float] = {}  # tool_call_id → t0
+        self._tool_started: dict[str, float] = {}
         self._bot_started_this_turn = False
 
     async def on_push_frame(self, data: FramePushed) -> None:
@@ -49,7 +34,7 @@ class TurnTelemetryObserver(BaseObserver):
         if frame.id in self._seen:
             return
         self._seen.add(frame.id)
-        if len(self._seen) > 8192:  # bounded memory over long calls
+        if len(self._seen) > 8192:
             self._seen.clear()
         now = time.perf_counter()
         rec = self._hub.record
@@ -85,9 +70,6 @@ class TurnTelemetryObserver(BaseObserver):
                 continue
             ms = int(item.value * 1000)
             name = (item.processor or "").lower()
-            # First TTFB of the turn wins; later ones belong to post-tool re-runs.
-            # NOTE: "stt" must be checked before "tts" — "...sttservice" also
-            # contains the substring "tts".
             if "stt" in name and rec.stt_final_ms < 0:
                 rec.stt_final_ms = ms
             elif "llm" in name and rec.llm_first_ms < 0:

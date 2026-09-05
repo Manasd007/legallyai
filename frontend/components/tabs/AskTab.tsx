@@ -6,10 +6,11 @@ import { ArrowIcon, ScalesIcon, ChatIcon } from "@/components/ui";
 import { useSession } from "@/components/session";
 import { CitedCase as CitedCaseCard, TrustBadge } from "@/components/CitedCase";
 import { postJson } from "@/components/api";
-import { useVoiceSession, voiceEnabled, type CallResult } from "@/components/voice/useVoiceSession";
+import { useVoiceSession, useVoiceEnabled, type CallResult } from "@/components/voice/useVoiceSession";
 import { VoiceBar } from "@/components/voice/VoiceBar";
 import { LiveTurns } from "@/components/voice/LiveTurns";
 import { VoiceSummary } from "@/components/VoiceSummary";
+import { TabIntro } from "@/components/tabs/TabIntro";
 import type { StoredMessage } from "@/components/tabs/types";
 
 type Cited = {
@@ -27,6 +28,7 @@ type Msg = {
   content: string;
   cases?: Cited[];
   weak?: boolean;
+  caution?: boolean;
 
   voiceCitations?: string[];
 };
@@ -47,6 +49,7 @@ function hydrate(messages: StoredMessage[]): Msg[] {
           content: m.content,
           cases: m.payload?.cited_cases,
           weak: m.payload?.weak_retrieval,
+          caution: m.payload?.grounding_caution,
           voiceCitations: m.payload?.voice_citations,
         },
   );
@@ -61,6 +64,7 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const botAudioRef = useRef<HTMLAudioElement>(null);
+  const voiceEnabled = useVoiceEnabled();
   const voice = useVoiceSession({ onComplete: (r) => absorbCall(r) });
 
   useEffect(() => {
@@ -80,12 +84,19 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
         answer: string;
         cited_cases?: Cited[];
         weak_retrieval?: boolean;
+        grounding_caution?: boolean;
         conversation_id?: string;
       }>("/api/chat", attach("assistant", { question, history }));
       commitConv("assistant", data.conversation_id);
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: data.answer, cases: data.cited_cases, weak: data.weak_retrieval },
+        {
+          role: "assistant",
+          content: data.answer,
+          cases: data.cited_cases,
+          weak: data.weak_retrieval,
+          caution: data.grounding_caution,
+        },
       ]);
     } catch (e) {
       setMessages((m) => [
@@ -122,7 +133,7 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
         e.preventDefault();
         ask(input);
       }}
-      className="flex items-center gap-2 rounded-xl border border-ink/15 bg-surface/80 px-2 py-1.5 shadow-card backdrop-blur"
+      className="flex items-center gap-2 rounded border-2 border-ink bg-surface/70 px-2 py-1.5 shadow-brutal-sm backdrop-blur-md"
     >
       <input
         value={input}
@@ -136,7 +147,7 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
           onClick={() => voice.start(botAudioRef.current)}
           title="Talk instead of typing"
           aria-label="Start a voice conversation"
-          className="rounded-lg p-2 text-ink/50 transition hover:bg-ink/5 hover:text-ink"
+          className="rounded border-2 border-transparent p-2 text-ink/50 transition hover:border-ink hover:bg-ink/5 hover:text-ink"
         >
           <Mic className="h-4 w-4" strokeWidth={1.8} aria-hidden />
         </button>
@@ -159,44 +170,18 @@ export function AskTab({ initialMessages }: { initialMessages?: StoredMessage[] 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
       {messages.length === 0 && voiceIdle ? (
-        <div className="flex flex-1 flex-col justify-center py-8">
-          <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-navy-900 text-gold-400">
-            <ChatIcon className="h-5 w-5" />
-          </span>
-          <h2 className="mt-4 text-center font-serif text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-            What would you like to know?
-          </h2>
-          <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-relaxed text-ink/60">
-            Every answer shows the Supreme Court cases it relied on, and follow-ups remember
-            what you asked before.
-          </p>
-
-          <div className="mt-6">{composer}</div>
-
-          {matter && (
-            <button
-              onClick={() => ask(matter)}
-              className="mt-4 w-full rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-2.5 text-left text-sm text-ink/80 transition hover:border-gold-500/50"
-            >
-              <span className="block text-[11px] font-semibold uppercase tracking-wider text-gold-700">
-                Continue your matter
-              </span>
-              <span className="mt-0.5 line-clamp-2 text-ink/70">{matter}</span>
-            </button>
-          )}
-
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            {STARTERS.map((q) => (
-              <button
-                key={q}
-                onClick={() => ask(q)}
-                className="rounded-full border border-ink/15 bg-surface/60 px-3.5 py-1.5 text-left text-xs text-ink/70 transition hover:border-ink/30 hover:text-ink"
-              >
-                {q.length > 52 ? q.slice(0, 52) + "…" : q}
-              </button>
-            ))}
-          </div>
-        </div>
+        <TabIntro
+          icon={ChatIcon}
+          title="What would you like to know?"
+          subtitle="Every answer shows the Supreme Court cases it relied on, and follow-ups remember what you asked before."
+          composer={composer}
+          matter={matter}
+          onUseMatter={() => matter && ask(matter)}
+          examples={STARTERS.map((q) => ({
+            label: q.length > 52 ? q.slice(0, 52) + "…" : q,
+            onClick: () => ask(q),
+          }))}
+        />
       ) : (
         <>
 
@@ -225,7 +210,7 @@ function MessageBubble({ msg }: { msg: Msg }) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-navy-900 px-4 py-2.5 text-sm leading-relaxed text-cream">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded border-2 border-ink bg-navy-900 px-4 py-2.5 text-sm leading-relaxed text-cream shadow-brutal-sm">
           {msg.content}
         </div>
       </div>
@@ -234,18 +219,18 @@ function MessageBubble({ msg }: { msg: Msg }) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] space-y-3">
-        <div className="whitespace-pre-wrap rounded-2xl border border-ink/10 bg-surface/70 px-4 py-3 text-sm leading-relaxed text-ink/85">
-          {msg.weak && (
-            <div className="mb-2 inline-flex rounded-full bg-gold-400/15 px-2.5 py-0.5 text-[11px] font-medium text-gold-700">
-              Limited matching cases
+        <div className="whitespace-pre-wrap rounded border-2 border-ink bg-surface/65 px-4 py-3 text-sm leading-relaxed text-ink/85 backdrop-blur-md">
+          {(msg.weak || msg.caution) && (
+            <div className="mb-2 inline-flex rounded border-2 border-gold-500/50 bg-gold-400/15 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-gold-700">
+              {msg.weak ? "Limited matching cases" : "Verify against the cited cases"}
             </div>
           )}
           {msg.content}
         </div>
         {msg.cases && msg.cases.length > 0 && (
-          <div className="rounded-2xl border border-ink/10 bg-surface/50 px-4 py-3">
+          <div className="rounded border-2 border-ink bg-surface/45 px-4 py-3 backdrop-blur-md">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink/55">
+              <div className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/55">
                 <ScalesIcon className="h-4 w-4 text-gold-600" /> Cases this answer is based on
               </div>
               <TrustBadge verified={msg.cases.length} fabricated={0} />
@@ -265,7 +250,7 @@ function MessageBubble({ msg }: { msg: Msg }) {
 function Thinking() {
   return (
     <div className="flex justify-start">
-      <div className="rounded-2xl border border-ink/10 bg-surface/70 px-4 py-3">
+      <div className="rounded border-2 border-ink bg-surface/65 px-4 py-3 backdrop-blur-md">
         <span className="flex gap-1">
           {[0, 0.15, 0.3].map((d) => (
             <span

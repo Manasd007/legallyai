@@ -1,9 +1,3 @@
-"""Query reformulation: layperson situation -> legal-issue statement (brief §6.2).
-
-Improves retrieval because dense judgment text and plain descriptions embed
-poorly against each other. On any LLM failure we degrade gracefully to the
-original question rather than failing the request.
-"""
 from __future__ import annotations
 
 import logging
@@ -21,8 +15,9 @@ def reformulate(question: str) -> str:
             model=get_settings().reformulate_model,
             system=system,
             user=question,
-            temperature=0.2,
-            max_tokens=400,
+            temperature=0.0,
+            max_tokens=600,
+            reasoning_effort="low",
         )
         out = out.strip()
         return out or question

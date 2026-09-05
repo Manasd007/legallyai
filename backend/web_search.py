@@ -1,9 +1,3 @@
-"""Keyless web search (DuckDuckGo) for the graceful out-of-scope fallback.
-
-When a question is outside Legally AI's legal scope we don't dead-end the user —
-we run a quick web search so the model can summarise real results with links.
-Degrades to [] on any failure so the caller can fall back further.
-"""
 from __future__ import annotations
 
 import logging

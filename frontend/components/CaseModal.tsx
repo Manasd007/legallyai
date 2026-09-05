@@ -31,9 +31,6 @@ export function CaseModal({
   const [mounted, setMounted] = useState(false);
   const citedRef = useRef<HTMLDivElement>(null);
 
-  // Render through a portal on the client only (document isn't available on the
-  // server). The portal is essential: cited-case cards animate via framer-motion,
-  // and a transformed ancestor would otherwise trap our `position: fixed` overlay.
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -61,7 +58,6 @@ export function CaseModal({
     };
   }, [citation, caseName, highlightId]);
 
-  // Stop the page (and Lenis) from scrolling behind the modal.
   useScrollLock(true);
 
   useEffect(() => {
@@ -87,11 +83,10 @@ export function CaseModal({
       aria-modal="true"
     >
       <div
-        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-lift sm:max-h-[88vh] sm:rounded-2xl"
+        className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border-2 border-ink bg-surface shadow-lift sm:max-h-[88vh] sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-ink/10 bg-surface px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b-2 border-ink bg-surface px-5 py-4">
           <div className="min-w-0">
             <div className="font-serif text-base font-semibold leading-snug text-ink">
               {doc?.case_name || caseName || "Judgment"}
@@ -104,7 +99,7 @@ export function CaseModal({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-lg p-1.5 text-ink/50 transition hover:bg-ink/5 hover:text-ink"
+            className="shrink-0 rounded border-2 border-transparent p-1.5 text-ink/50 transition hover:border-ink hover:bg-ink/5 hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
               strokeLinecap="round" className="h-5 w-5" aria-hidden>
@@ -113,7 +108,6 @@ export function CaseModal({
           </button>
         </div>
 
-        {/* Body */}
         <div className="overflow-auto px-5 py-5 sm:px-6" data-lenis-prevent>
           {err && <p className="text-sm text-red-600">{err}</p>}
           {!doc && !err && (
@@ -124,7 +118,7 @@ export function CaseModal({
           )}
           {doc && (
             <div className="mx-auto max-w-2xl">
-              <p className="mb-5 rounded-lg border border-ink/10 bg-ink/[0.03] px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-ink/55">
+              <p className="mb-5 rounded border-2 border-ink/15 bg-ink/[0.03] px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-ink/55">
                 Full judgment reconstructed from the indexed corpus · {doc.n_chunks} passage
                 {doc.n_chunks === 1 ? "" : "s"}. The{" "}
                 <span className="font-semibold text-gold-700">highlighted passage</span> is the one

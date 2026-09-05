@@ -1,10 +1,3 @@
-"""Citation verification + weak-retrieval hedge (brief §6.5) — MANDATORY guard.
-
-Every cited case must trace to a document in the retrieved set. Anything else
-is stripped. If verification empties the citations, or max retrieval similarity
-was below threshold, we override the outcome to Uncertain and hedge honestly.
-This is the single most important anti-hallucination step.
-"""
 from __future__ import annotations
 
 import logging
@@ -23,12 +16,10 @@ WEAK_RETRIEVAL_MESSAGE = (
 
 
 def _norm(s: str) -> str:
-    """Loose normalization so 'AIR 2019 SC 123' == 'air 2019 sc 123.'."""
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
 
 def _best_chunk_for(cite: dict, result: RetrievalResult):
-    """Find the retrieved chunk that grounds a citation (best similarity match)."""
     key_c = _norm(cite.get("citation", ""))
     key_n = _norm(cite.get("case_name", ""))
     best = None
@@ -40,11 +31,6 @@ def _best_chunk_for(cite: dict, result: RetrievalResult):
 
 
 def verify(prediction: dict, result: RetrievalResult) -> dict:
-    """Return a verified copy of the prediction with a `verification` block.
-
-    Each KEPT citation is enriched with `source`: the exact passage from the real
-    judgment that grounds it, so the UI can let users trace every claim (provenance).
-    """
     s = get_settings()
     retrieved_citations = {_norm(c.citation) for c in result.chunks if c.citation}
     retrieved_names = {_norm(c.case_name) for c in result.chunks if c.case_name}

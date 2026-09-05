@@ -1,10 +1,3 @@
-"""Supabase client + persistence helpers (brief §6.6, §8).
-
-Persists cases, predictions, explanations, feedback. Uses the service key
-(backend only). Auth/JWT verification of the caller is wired in main.py.
-All writes are best-effort in v1: a persistence failure must not break the
-user-facing answer (we log and continue).
-"""
 from __future__ import annotations
 
 import logging
@@ -18,7 +11,7 @@ log = logging.getLogger("legally.db")
 
 @lru_cache
 def _client():
-    from supabase import create_client  # lazy import
+    from supabase import create_client
 
     s = get_settings()
     if not s.supabase_url or not s.supabase_service_key:
@@ -26,8 +19,31 @@ def _client():
     return create_client(s.supabase_url, s.supabase_service_key)
 
 
+def _slim_payload(payload: dict | None) -> dict | None:
+    if not isinstance(payload, dict):
+        return payload
+    try:
+        import copy
+
+        p = copy.deepcopy(payload)
+
+        def _strip(c: dict) -> dict:
+            if isinstance(c, dict):
+                c.pop("excerpt", None)
+                src = c.get("source")
+                if isinstance(src, dict):
+                    src.pop("excerpt", None)
+            return c
+
+        if isinstance(p.get("cited_cases"), list):
+            p["cited_cases"] = [_strip(c) for c in p["cited_cases"]]
+        return p
+    except Exception as e:  # noqa: BLE001 - slimming must never lose a turn
+        log.warning("payload slim failed (%s); storing as-is.", e)
+        return payload
+
+
 def persist_query(*, user_id: str, raw_text: str, prediction: dict, title: str | None = None) -> str | None:
-    """Insert case + prediction + explanation. Returns case_id (or None on failure)."""
     try:
         sb = _client()
         case = (
@@ -52,12 +68,13 @@ def persist_query(*, user_id: str, raw_text: str, prediction: dict, title: str |
         prediction_id = pred.data[0]["id"]
 
         verification = prediction.get("verification", {})
+        slim = _slim_payload({"cited_cases": prediction.get("cited_cases", [])})
         sb.table("explanations").insert(
             {
                 "prediction_id": prediction_id,
                 "summary_text": prediction.get("situation_summary", ""),
                 "reasoning": prediction.get("reasoning", ""),
-                "cited_cases": prediction.get("cited_cases", []),
+                "cited_cases": (slim or {}).get("cited_cases", []),
                 "retrieved_ids": verification.get("retrieved_ids", []),
                 "method": prediction.get("_model_version", "gemini-rag-v1"),
             }
@@ -84,13 +101,8 @@ def list_history(user_id: str) -> list[dict]:
         return []
 
 
-# ── Conversation threads (returning-user history / "chat sections") ──────────
-# These power the sidebar of past sessions. The backend uses the service key, so
-# RLS is bypassed; we therefore ALWAYS filter reads by user_id ourselves so one
-# user can never reach another's thread.
 
 def _title_from(text: str, limit: int = 60) -> str:
-    """A short, human title for a thread, derived from the first user message."""
     t = " ".join((text or "").split())
     return (t[: limit - 1] + "…") if len(t) > limit else (t or "Untitled")
 
@@ -106,7 +118,6 @@ _TITLE_SYSTEM = (
 
 
 def _clean_title(raw: str, max_words: int = 6, max_chars: int = 48) -> str:
-    """Sanitize an LLM title: strip quotes/labels/punctuation, cap words & length."""
     t = " ".join((raw or "").split())
     t = t.strip("\"'“”‘’ ")
     t = re.sub(r"^(title|session)\s*[:\-]\s*", "", t, flags=re.IGNORECASE)
@@ -118,24 +129,22 @@ def _clean_title(raw: str, max_words: int = 6, max_chars: int = 48) -> str:
 
 
 def _smart_title(text: str) -> str:
-    """A concise 4-5 word title for a thread. Uses the fast intake LLM, and falls
-    back to a truncation of the first message on any error (persistence must never
-    break the answer path) or for messages already short enough to stand alone."""
     cleaned = " ".join((text or "").split())
     if not cleaned:
         return "Untitled"
-    if len(cleaned) <= 40:  # already title-length; don't spend a call on it
+    if len(cleaned) <= 40:
         return cleaned
     try:
-        from llm import complete  # lazy: keep persistence import-light
+        from llm import complete
 
         title = _clean_title(
             complete(
-                model=get_settings().router_model,  # fast, cheap Groq intake model
+                model=get_settings().router_model,
                 system=_TITLE_SYSTEM,
                 user=cleaned[:600],
                 temperature=0.0,
-                max_tokens=20,
+                max_tokens=512,
+                reasoning_effort="low",
             )
         )
         return title or _title_from(cleaned)
@@ -156,13 +165,6 @@ def record_turn(
     title: str | None = None,
     session_id: str | None = None,
 ) -> str | None:
-    """Append a user→assistant exchange to a thread, creating it on the first turn.
-
-    `session_id` groups the per-tool threads of one workspace session; it's only
-    used when the thread is first created. Returns the conversation_id so the
-    client can keep the thread going. Entirely best-effort: a persistence failure
-    must never break the user-facing answer.
-    """
     try:
         sb = _client()
         if not conversation_id:
@@ -180,7 +182,6 @@ def record_turn(
             )
             conversation_id = conv.data[0]["id"]
         else:
-            # Make sure the caller owns this thread before appending to it.
             owned = (
                 sb.table("conversations")
                 .select("id")
@@ -198,14 +199,11 @@ def record_turn(
                 "conversation_id": conversation_id,
                 "role": "assistant",
                 "content": assistant_text,
-                "payload": payload,
+                "payload": _slim_payload(payload),
                 "case_id": case_id,
             },
         ]
         sb.table("messages").insert(rows).execute()
-        # Bump updated_at so the sidebar sorts this thread to the top. Send an
-        # ISO timestamp (PostgREST passes it through as a literal — "now()" would
-        # be stored as the string, not evaluated).
         from datetime import datetime, timezone
 
         sb.table("conversations").update(
@@ -218,7 +216,6 @@ def record_turn(
 
 
 def list_conversations(user_id: str) -> list[dict]:
-    """Sidebar list: most-recently-active threads first."""
     try:
         return (
             _client()
@@ -236,7 +233,6 @@ def list_conversations(user_id: str) -> list[dict]:
 
 
 def get_conversation(*, user_id: str, conversation_id: str) -> dict | None:
-    """Full thread (header + ordered messages), or None if not found/owned."""
     try:
         sb = _client()
         conv = (
@@ -262,14 +258,8 @@ def get_conversation(*, user_id: str, conversation_id: str) -> dict | None:
         return None
 
 
-# ── Sessions (the workspace-level grouping of per-tool threads) ──────────────
-# One session bundles up to three threads (predict/documents, assistant,
-# statutes) under a shared session_id. The sidebar lists sessions, not raw
-# threads, so a single matter shows as one entry. Legacy rows (session_id null)
-# are surfaced as singleton sessions keyed by their own conversation id.
 
 def list_sessions(user_id: str) -> list[dict]:
-    """Sidebar list: one entry per workspace session, most-recently-active first."""
     try:
         rows = (
             _client()
@@ -303,8 +293,6 @@ def list_sessions(user_id: str) -> list[dict]:
         g["tools"].add(r["tool"])
         if (r.get("updated_at") or "") > g["updated_at"]:
             g["updated_at"] = r["updated_at"]
-        # Title comes from the *earliest* thread in the session (the matter as
-        # first described). Rows arrive newest-first, so an older one wins.
         if (r.get("created_at") or "") < g["title_at"]:
             g["title"] = r.get("title") or g["title"]
             g["title_at"] = r.get("created_at") or g["title_at"]
@@ -324,11 +312,6 @@ def list_sessions(user_id: str) -> list[dict]:
 
 
 def get_session(*, user_id: str, session_id: str) -> dict | None:
-    """Every thread in a session, each with its ordered messages, for rehydration.
-
-    Accepts either a real session_id or a bare conversation id (legacy singleton
-    sessions). Returns None if nothing the caller owns matches.
-    """
     try:
         sb = _client()
         convs = (
@@ -340,7 +323,6 @@ def get_session(*, user_id: str, session_id: str) -> dict | None:
             .execute()
             .data
         )
-        # Fall back to a singleton (legacy rows have no session_id).
         if not convs:
             one = (
                 sb.table("conversations")

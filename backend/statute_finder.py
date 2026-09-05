@@ -1,10 +1,3 @@
-"""Statute & Section Finder.
-
-Given a situation, identify the Indian Acts/sections most likely to govern it and
-link them to retrieved judgments that apply them. Statute names are public legal
-facts; the prompt forbids fabricating section numbers and prefers provisions that
-actually appear in the retrieved cases.
-"""
 from __future__ import annotations
 
 import json
@@ -48,7 +41,7 @@ def _normalize(data: dict) -> dict:
 def find(question: str) -> dict:
     s = get_settings()
     reformulated = reformulate_mod.reformulate(question)
-    result = retrieval_mod.retrieve(reformulated, question)  # may raise FileNotFoundError
+    result = retrieval_mod.retrieve(reformulated, question)
 
     cases = legal_qa_mod._dedupe_cases(result)
     context = legal_qa_mod._format_context(result)
@@ -71,7 +64,8 @@ def find(question: str) -> dict:
                 user=user if attempt == 0 else user + "\n\nReturn VALID JSON ONLY.",
                 temperature=0.2,
                 json_mode=True,
-                max_tokens=1200,
+                max_tokens=2400,
+                reasoning_effort="low",
             )
             out = _normalize(json.loads(_strip_fences(raw)))
             break

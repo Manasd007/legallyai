@@ -8,9 +8,6 @@ import { useSession } from "@/components/session";
 import { getJson } from "@/components/api";
 import { ScalesIcon, ChatIcon, BookIcon, DocIcon } from "@/components/ui";
 
-/* The signed-in account control + the list of past sessions. Both live in the
-   workspace sidebar. History only loads when a user is signed in — otherwise
-   sessions aren't saved to an account. */
 
 type SessionItem = {
   session_id: string;
@@ -50,17 +47,17 @@ export function AccountPanel({ onNavigate }: { onNavigate?: () => void }) {
 
   if (!enabled) {
     return (
-      <div className="rounded-xl border border-dashed border-ink/15 bg-surface/40 p-3 text-[11px] leading-relaxed text-ink/50">
+      <div className="rounded border-2 border-dashed border-ink/25 bg-surface/40 p-3 text-[11px] leading-relaxed text-ink/50">
         Sign-in isn’t configured. Set the Supabase keys to save your history across visits.
       </div>
     );
   }
 
-  if (!ready) return <div className="h-12 animate-pulse rounded-xl bg-ink/5" />;
+  if (!ready) return <div className="h-12 animate-pulse rounded border-2 border-ink/10 bg-ink/5" />;
 
   if (user) {
     return (
-      <div className="rounded-xl border border-ink/10 bg-surface/50 p-3">
+      <div className="rounded border-2 border-ink/20 bg-surface/50 p-3">
         <div className="flex items-center gap-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-navy-900 text-xs font-semibold text-cream">
             {(user.email?.[0] || "U").toUpperCase()}
@@ -93,22 +90,22 @@ export function AccountPanel({ onNavigate }: { onNavigate?: () => void }) {
 
   if (sent) {
     return (
-      <div className="rounded-xl border border-gold-500/30 bg-gold-400/[0.07] p-3 text-[11px] leading-relaxed text-ink/70">
+      <div className="rounded border-2 border-gold-500/50 bg-gold-400/[0.08] p-3 text-[11px] leading-relaxed text-ink/70">
         Check <span className="font-semibold">{email}</span> for a sign-in link. Open it on this device to continue.
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-ink/10 bg-surface/50 p-3">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-ink/45">Save your history</div>
+    <div className="rounded border-2 border-ink/20 bg-surface/50 p-3">
+      <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Save your history</div>
       <form onSubmit={send} className="mt-2 flex flex-col gap-2">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@email.com"
-          className="rounded-lg border border-ink/15 bg-parchment/60 px-2.5 py-1.5 text-xs text-ink outline-none placeholder:text-ink/40 focus:border-ink/30"
+          className="rounded border-2 border-ink bg-parchment/60 px-2.5 py-1.5 text-xs text-ink outline-none placeholder:text-ink/40 focus:shadow-brutal-sm"
         />
         <button type="submit" disabled={busy || !email.trim()} className="btn-primary justify-center px-3 py-1.5 text-xs">
           {busy ? "Sending…" : "Email me a link"}
@@ -116,7 +113,7 @@ export function AccountPanel({ onNavigate }: { onNavigate?: () => void }) {
       </form>
       <button
         onClick={() => signInWithGoogle().catch((e) => setErr(e.message))}
-        className="mt-2 w-full rounded-lg border border-ink/15 bg-parchment/60 px-3 py-1.5 text-xs font-medium text-ink/75 transition hover:border-ink/30"
+        className="btn-ghost mt-2 w-full justify-center px-3 py-1.5 text-xs"
       >
         Continue with Google
       </button>
@@ -141,8 +138,6 @@ export function HistoryPanel({ onNavigate }: { onNavigate?: () => void }) {
       .catch(() => setItems([]));
   }, [user]);
 
-  // Reload on sign-in, on navigation (a new session may have just been created),
-  // and when the tab regains focus.
   useEffect(() => {
     load();
   }, [load, pathname]);
@@ -154,16 +149,15 @@ export function HistoryPanel({ onNavigate }: { onNavigate?: () => void }) {
 
   if (!ready || !user) return null;
 
-  // Order the tool chips consistently (Assess · Ask · Find law) and de-duplicate.
   const TOOL_ORDER = ["predict", "documents", "assistant", "statutes"];
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-ink/40">History</div>
+      <div className="px-2 pb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/40">History</div>
       {items === null ? (
         <div className="space-y-1.5 px-1">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-9 animate-pulse rounded-lg bg-ink/5" />
+            <div key={i} className="h-9 animate-pulse rounded border-2 border-ink/10 bg-ink/5" />
           ))}
         </div>
       ) : items.length === 0 ? (
@@ -178,10 +172,10 @@ export function HistoryPanel({ onNavigate }: { onNavigate?: () => void }) {
             return (
               <Link
                 key={s.session_id}
-                href={`/workspace?session=${s.session_id}`}
+                href={`/workspace/assess?session=${s.session_id}`}
                 onClick={onNavigate}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 transition ${
-                  active ? "bg-ink/10" : "hover:bg-ink/5"
+                className={`flex items-center gap-3 rounded border-2 px-3 py-2.5 transition ${
+                  active ? "border-ink bg-ink/10" : "border-transparent hover:border-ink/20 hover:bg-ink/5"
                 }`}
               >
                 <span className="flex shrink-0 -space-x-1.5">
@@ -190,7 +184,7 @@ export function HistoryPanel({ onNavigate }: { onNavigate?: () => void }) {
                     return (
                       <span
                         key={t}
-                        className="grid h-6 w-6 place-items-center rounded-full bg-surface text-ink/55 ring-1 ring-ink/10"
+                        className="grid h-6 w-6 place-items-center rounded-full bg-surface text-ink/55 ring-2 ring-ink/15"
                       >
                         <Icon className="h-3.5 w-3.5" />
                       </span>

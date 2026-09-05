@@ -58,6 +58,9 @@ Return ONE JSON object and nothing else, no markdown fences, no text outside it.
 Reasoning should be plain-language, 120–220 words, and name the cases it relies on.
 Do not use em dashes (—) anywhere in the output; use a comma, period, or
 parentheses instead.
+Write the reasoning as a lawyer's analysis: refer to cases BY NAME. Never expose the
+retrieval machinery, do not write "the retrieved sources", "the documents provided",
+"the material I was given", or similar. Be precise and on point, no generic filler.
 
 Schema:
 {

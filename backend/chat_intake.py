@@ -1,16 +1,3 @@
-"""Conversation-aware intake for the chat path.
-
-Decides how to handle the latest user turn so we don't force case retrieval (or a
-web search) onto greetings, small talk, or questions about the assistant itself.
-
-Modes:
-  - "smalltalk": greeting / chit-chat / meta / off-topic → short friendly reply.
-  - "general":   conceptual legal question → answer from general knowledge, no
-                 specific case citations.
-  - "case_law":  needs grounding in retrieved Supreme Court cases.
-
-A single fast Groq call returning JSON. Fails open to "case_law" (grounding is the
-safe default for anything that might be a real legal question)."""
 from __future__ import annotations
 
 import json
@@ -19,6 +6,7 @@ from typing import Literal
 
 from config import get_settings, load_prompt
 from llm import complete
+from textutil import is_smalltalk
 
 log = logging.getLogger("legally.chat_intake")
 
@@ -35,6 +23,8 @@ def _convo(history: list[dict], limit: int = 6) -> str:
 
 def classify(question: str, history: list[dict] | None = None) -> Mode:
     history = history or []
+    if is_smalltalk(question):
+        return "smalltalk"
     user = f"CONVERSATION SO FAR:\n{_convo(history)}\n\nLATEST MESSAGE: {question}"
     try:
         out = complete(
@@ -43,7 +33,8 @@ def classify(question: str, history: list[dict] | None = None) -> Mode:
             user=user,
             temperature=0.0,
             json_mode=True,
-            max_tokens=40,
+            max_tokens=512,
+            reasoning_effort="low",
         )
         text = out.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         mode = json.loads(text).get("mode")

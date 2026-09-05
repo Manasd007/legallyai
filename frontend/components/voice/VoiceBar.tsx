@@ -53,7 +53,7 @@ export function VoiceBar({
       initial={reduce ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: EASE }}
-      className="relative overflow-hidden rounded-[1.3rem] border border-gold-500/40 bg-surface/85 shadow-card backdrop-blur-md"
+      className="relative overflow-hidden rounded border-2 border-ink bg-surface/70 shadow-brutal-sm backdrop-blur-md"
     >
 
       {!reduce && !live && (
@@ -66,10 +66,10 @@ export function VoiceBar({
       )}
 
       <div className="relative flex items-center gap-3 p-2.5">
-        <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gold-500/15 text-gold-600">
+        <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-gold-500/50 bg-gold-500/15 text-gold-600">
           {live && !reduce && (
             <motion.span
-              className="absolute inset-0 rounded-xl bg-gold-500/25"
+              className="absolute inset-0 rounded bg-gold-500/25"
               animate={{ scale: [1, 1.35], opacity: [0.5, 0] }}
               transition={{ duration: 1.6, repeat: Infinity, ease: "easeOut" }}
             />
@@ -92,7 +92,7 @@ export function VoiceBar({
             onClick={onStop}
             title="Finish and write up"
             aria-label="Finish the voice conversation"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-onbrand shadow-sm ring-1 ring-inset ring-white/10 transition hover:-translate-y-px hover:shadow-lift"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-ink bg-brand text-onbrand shadow-brutal-sm transition hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-brutal active:translate-x-0 active:translate-y-0 active:shadow-none"
           >
             <Check className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>
@@ -103,7 +103,7 @@ export function VoiceBar({
             disabled={summarizing}
             title="Cancel"
             aria-label="Cancel the voice conversation"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink/45 transition hover:bg-ink/[0.06] hover:text-ink disabled:opacity-40"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-transparent text-ink/45 transition hover:border-ink hover:bg-ink/[0.06] hover:text-ink disabled:opacity-40"
           >
             <X className="h-4 w-4" strokeWidth={2} aria-hidden />
           </button>

@@ -1,17 +1,13 @@
-"""Grounded predict + explain — single LLM call (brief §6.4).
-
-Returns the structured JSON contract. Robust to malformed JSON: parse, retry
-once with a "valid JSON only" reminder, then fall back to an Uncertain hedge.
-Citation verification (verify.py) runs AFTER this, on the returned cited_cases.
-"""
 from __future__ import annotations
 
 import json
 import logging
 
+import context_assembly
 from config import get_settings, load_prompt
 from llm import complete
 from retrieval import RetrievalResult
+import validator as validator_mod
 
 log = logging.getLogger("legally.predict")
 
@@ -22,7 +18,10 @@ _VALID_CONFIDENCE = {"low", "medium", "high"}
 
 
 def _format_context(result: RetrievalResult) -> str:
-    """Render retrieved chunks into a numbered, citation-tagged block."""
+    try:
+        return context_assembly.format_context(result)
+    except Exception as e:  # noqa: BLE001 - never fail prediction on formatting
+        log.warning("Case assembly failed (%s); using flat chunk context.", e)
     parts = []
     for i, c in enumerate(result.chunks, 1):
         parts.append(
@@ -44,6 +43,7 @@ def _strip_fences(text: str) -> str:
 
 
 def _normalize(data: dict) -> dict:
+    from textutil import normalize_text as _n
     outcome = data.get("likely_outcome", "Uncertain")
     if outcome not in _VALID_OUTCOMES:
         outcome = "Uncertain"
@@ -61,28 +61,28 @@ def _normalize(data: dict) -> dict:
         assessment = str(f.get("assessment", "unclear")).lower()
         if assessment not in ("favorable", "unfavorable", "unclear"):
             assessment = "unclear"
-        factor = str(f.get("factor", "")).strip()
+        factor = _n(str(f.get("factor", "")).strip())
         if factor:
             factors.append({
                 "factor": factor,
                 "assessment": assessment,
-                "reason": str(f.get("reason", "")).strip(),
+                "reason": _n(str(f.get("reason", "")).strip()),
             })
 
-    strengthen = [str(x).strip() for x in (data.get("what_would_strengthen") or []) if str(x).strip()]
+    strengthen = [_n(str(x).strip()) for x in (data.get("what_would_strengthen") or []) if str(x).strip()]
 
     return {
-        "situation_summary": str(data.get("situation_summary", "")),
+        "situation_summary": _n(str(data.get("situation_summary", ""))),
         "likely_outcome": outcome,
         "confidence": conf,
-        "reasoning": str(data.get("reasoning", "")),
+        "reasoning": _n(str(data.get("reasoning", ""))),
         "key_factors": factors,
         "what_would_strengthen": strengthen,
         "cited_cases": [
             {
                 "case_name": str(c.get("case_name", "")),
                 "citation": str(c.get("citation", "")),
-                "relevance": str(c.get("relevance", "")),
+                "relevance": _n(str(c.get("relevance", ""))),
             }
             for c in cited
             if isinstance(c, dict)
@@ -90,22 +90,53 @@ def _normalize(data: dict) -> dict:
     }
 
 
+_FALLBACK_REASONING = (
+    "I could not produce a reliable structured prediction for this "
+    "situation from the retrieved material."
+)
+
+
 def _uncertain_fallback(summary: str = "") -> dict:
     return {
         "situation_summary": summary,
         "likely_outcome": "Uncertain",
         "confidence": "low",
-        "reasoning": (
-            "I could not produce a reliable structured prediction for this "
-            "situation from the retrieved material."
-        ),
+        "reasoning": _FALLBACK_REASONING,
         "key_factors": [],
         "what_would_strengthen": [],
         "cited_cases": [],
     }
 
 
-def predict(reformulated_query: str, original_question: str, result: RetrievalResult) -> dict:
+def _render_draft(prediction: dict) -> str:
+    lines = [
+        f"Likely outcome: {prediction.get('likely_outcome')}",
+        f"Stated confidence: {prediction.get('confidence')}",
+        f"Reasoning: {prediction.get('reasoning')}",
+    ]
+    factors = prediction.get("key_factors") or []
+    if factors:
+        lines.append("Key factors:")
+        for f in factors:
+            lines.append(
+                f"  - {f.get('factor')} [{f.get('assessment')}]: {f.get('reason')}"
+            )
+    cited = prediction.get("cited_cases") or []
+    if cited:
+        lines.append("Cases relied on:")
+        for c in cited:
+            lines.append(
+                f"  - {c.get('case_name')} ({c.get('citation')}): {c.get('relevance')}"
+            )
+    return "\n".join(lines)
+
+
+def predict(
+    reformulated_query: str,
+    original_question: str,
+    result: RetrievalResult,
+    feedback: str | None = None,
+) -> dict:
     system = load_prompt("predict_system_v2.txt")
     context = _format_context(result)
     user = (
@@ -114,6 +145,14 @@ def predict(reformulated_query: str, original_question: str, result: RetrievalRe
         .replace("{original_question}", original_question)
         .replace("{retrieved_context}", context)
     )
+    if feedback:
+        user += (
+            "\n\n# REVIEWER FEEDBACK ON YOUR PREVIOUS DRAFT (correct these):\n"
+            + feedback
+            + "\nGround every claim strictly in the RETRIEVED SOURCES, remove or hedge "
+            "anything they do not support, lower confidence if the evidence is thin, "
+            "and prefer 'Uncertain' over a forced verdict. Return the JSON again."
+        )
 
     model = get_settings().reasoning_model
     for attempt in range(2):
@@ -124,7 +163,8 @@ def predict(reformulated_query: str, original_question: str, result: RetrievalRe
                 user=user if attempt == 0 else user + "\n\nReturn VALID JSON ONLY.",
                 temperature=0.25,
                 json_mode=True,
-                max_tokens=1200,
+                max_tokens=2400,
+                reasoning_effort="low",
             )
             data = json.loads(_strip_fences(raw))
             return _normalize(data)
@@ -136,3 +176,51 @@ def predict(reformulated_query: str, original_question: str, result: RetrievalRe
             break
 
     return _uncertain_fallback()
+
+
+def predict_validated(
+    reformulated_query: str,
+    original_question: str,
+    result: RetrievalResult,
+    precedent: dict | None = None,
+    classifier: dict | None = None,
+) -> tuple[dict, dict]:
+    prediction = predict(reformulated_query, original_question, result)
+
+    if prediction.get("likely_outcome") == "Uncertain" and prediction.get("confidence") == "low":
+        return prediction, validator_mod.public_view(validator_mod._pass(ok=True))
+
+    context = _format_context(result)
+
+    def _run_review(pred: dict):
+        return validator_mod.review(
+            question=original_question,
+            context_block=context,
+            draft=_render_draft(pred),
+            result=result,
+            cited_cases=pred.get("cited_cases", []),
+            llm_outcome=pred.get("likely_outcome"),
+            precedent=precedent,
+            classifier=classifier,
+        )
+
+    crit = _run_review(prediction)
+    validation = validator_mod.public_view(crit)
+
+    if crit["verdict"] == "revise" and crit.get("feedback"):
+        revised = predict(
+            reformulated_query, original_question, result, feedback=crit["feedback"]
+        )
+        if revised.get("reasoning") != _FALLBACK_REASONING:
+            prediction = revised
+            validation["revised"] = True
+            crit = _run_review(prediction)
+            validation["confidence_ceiling"] = crit.get("max_confidence")
+
+    ceiling = crit.get("max_confidence")
+    if ceiling and prediction.get("confidence") in _VALID_CONFIDENCE:
+        capped = validator_mod._cap_confidence(prediction["confidence"], ceiling)
+        if capped != prediction["confidence"]:
+            prediction["confidence"] = capped
+            validation["confidence_capped_to"] = capped
+    return prediction, validation

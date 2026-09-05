@@ -1,12 +1,6 @@
 "use client";
 
-/* Browser-side Supabase client (auth only — the corpus and predictions live
-   behind the FastAPI backend, not direct Postgres). One shared instance per tab;
-   it persists the session to localStorage and refreshes tokens automatically.
 
-   If the env vars are missing (e.g. a contributor hasn't set up Supabase yet),
-   `supabase` is null and the app runs in "signed-out / dev" mode rather than
-   crashing — auth simply isn't available. */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -21,7 +15,6 @@ export const supabase: SupabaseClient | null = supabaseEnabled
     })
   : null;
 
-/** The current access token (JWT), or null when signed out / Supabase off. */
 export async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();

@@ -1,23 +1,3 @@
-"""Win/lose (1/0) prediction ensemble — the novel part (brief §2, §10).
-
-We never ship a bare LLM guess for "did the applicant win". Instead we combine
-up to THREE independent signals and judge our own confidence by how much they
-AGREE:
-
-  1. precedent_vote  — count the REAL outcomes of the retrieved analogous cases
-                       (uses `outcome`/disposal_nature we store at ingest). This
-                       is grounded in decided cases, not the model's imagination.
-  2. llm_forecast    — the reasoning model's Granted/Dismissed call.
-  3. classifier      — an offline PredEx-trained InLegalBERT probability
-                       (optional; absent until trained — see pipeline/finetune).
-
-Honesty rules (brief §2):
-  * 1 = applicant (appellant/petitioner) prevailed; 0 = did not.
-  * Only meaningful for appeal-shaped questions. If the LLM returned "Uncertain"
-    (e.g. a non-appellate tenancy/consumer situation) we still surface the
-    precedent lean but mark it advisory, never a verdict.
-  * Always a probability with the underlying cases attached.
-"""
 from __future__ import annotations
 
 from config import get_settings
@@ -25,25 +5,34 @@ from retrieval import RetrievalResult
 
 
 def outcome_to_label(outcome: str) -> int | None:
-    """Map a recorded disposal/outcome string to 1 (win) / 0 (loss) / None."""
     o = (outcome or "").lower()
     if "partly" in o or "part allowed" in o:
-        return None  # genuinely mixed — don't force a side
+        return None
     if "allow" in o or "granted" in o or "set aside" in o:
         return 1
     if "dismiss" in o or "rejected" in o:
         return 0
-    return None  # "disposed of", "withdrawn", unknown -> no clear side
+    return None
 
 
 def llm_outcome_to_label(likely_outcome: str) -> int | None:
     return {"Granted": 1, "Dismissed": 0}.get(likely_outcome)
 
 
+_LLM_PROB = {
+    ("Granted", "high"): 0.85, ("Granted", "medium"): 0.72, ("Granted", "low"): 0.60,
+    ("Dismissed", "high"): 0.15, ("Dismissed", "medium"): 0.28, ("Dismissed", "low"): 0.40,
+}
+
+
+def llm_outcome_to_prob(likely_outcome: str, confidence: str | None) -> float | None:
+    if likely_outcome not in ("Granted", "Dismissed"):
+        return None
+    return _LLM_PROB.get((likely_outcome, confidence or "low"), 0.5)
+
+
 def precedent_vote(result: RetrievalResult) -> dict:
-    """Similarity-weighted win-probability from the retrieved precedents' real outcomes."""
     s = get_settings()
-    # Collapse to one (best) chunk per case so a case isn't counted many times.
     by_case: dict[str, object] = {}
     for c in result.chunks:
         key = (c.citation or c.case_name).strip()
@@ -95,12 +84,12 @@ def _confidence(n_signals: int, agree: bool) -> str:
     if n_signals == 0:
         return "low"
     if not agree:
-        return "low"  # signals disagree -> be humble
+        return "low"
     if n_signals >= 3:
         return "high"
     if n_signals == 2:
         return "medium"
-    return "low"  # a single lone signal
+    return "low"
 
 
 def combine(
@@ -108,8 +97,8 @@ def combine(
     precedent: dict,
     llm_outcome: str,
     classifier: dict | None,
+    llm_confidence: str | None = None,
 ) -> dict:
-    """Blend available signals into a final 1/0 + an agreement-aware confidence."""
     probs: list[float] = []
     labels: list[int] = []
     used: list[str] = []
@@ -121,9 +110,10 @@ def combine(
         used.append("precedent_vote")
 
     llm_label = llm_outcome_to_label(llm_outcome)
-    if llm_label is not None:
-        probs.append(float(llm_label))
-        labels.append(llm_label)
+    llm_prob = llm_outcome_to_prob(llm_outcome, llm_confidence)
+    if llm_prob is not None:
+        probs.append(llm_prob)
+        labels.append(1 if llm_prob >= 0.5 else 0)
         used.append("llm_forecast")
 
     if classifier and classifier.get("available") and classifier.get("win_probability") is not None:

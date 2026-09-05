@@ -1,19 +1,14 @@
-"""Conversational legal Q&A grounded in the case-law corpus (the "Legal Q&A
-Assistant" feature).
-
-Distinct from doc_analyze.chat (which is grounded in ONE uploaded document): this
-answers free-form legal questions grounded in cases retrieved from the FAISS corpus,
-and keeps conversational context so follow-up questions work.
-"""
 from __future__ import annotations
 
 import logging
 
 import chat_intake as chat_intake_mod
+import context_assembly
 from config import get_settings, load_prompt
 from llm import complete
 import reformulate as reformulate_mod
 import retrieval as retrieval_mod
+import validator as validator_mod
 
 log = logging.getLogger("legally.qa")
 
@@ -26,16 +21,11 @@ def _convo(history: list[dict], limit: int = 6) -> str:
 
 
 def _retrieval_query(question: str, history: list[dict]) -> str:
-    """Build a standalone retrieval query so follow-ups carry prior context.
-
-    Cheap: prepend the last couple of user turns to the current question rather
-    than spending an extra LLM call to rewrite it."""
     prior = [h["content"] for h in history if h.get("role") == "user"][-2:]
     return " ".join([*prior, question]).strip() if prior else question
 
 
 def _dedupe_cases(result: retrieval_mod.RetrievalResult, limit: int = 5) -> list[dict]:
-    """Collapse chunks to one entry per case (best similarity), for display."""
     by_case: dict[str, dict] = {}
     for c in result.chunks:
         key = (c.citation or c.case_name).strip()
@@ -61,6 +51,10 @@ def _dedupe_cases(result: retrieval_mod.RetrievalResult, limit: int = 5) -> list
 
 
 def _format_context(result: retrieval_mod.RetrievalResult) -> str:
+    try:
+        return context_assembly.format_context(result)
+    except Exception as e:  # noqa: BLE001 - never fail the answer on formatting
+        log.warning("Case assembly failed (%s); using flat chunk context.", e)
     parts = []
     for i, c in enumerate(result.chunks, 1):
         parts.append(
@@ -72,7 +66,6 @@ def _format_context(result: retrieval_mod.RetrievalResult) -> str:
 
 
 def _empty(answer: str, mode: str) -> dict:
-    """Shape for a non-grounded reply (no retrieval, no citations)."""
     return {
         "answer": answer,
         "cited_cases": [],
@@ -91,7 +84,8 @@ def _smalltalk(question: str, history: list[dict]) -> dict:
             system=load_prompt("chat_smalltalk_v1.txt"),
             user=user,
             temperature=0.4,
-            max_tokens=160,
+            max_tokens=600,
+            reasoning_effort="low",
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("smalltalk reply failed: %s", e)
@@ -111,7 +105,8 @@ def _general(question: str, history: list[dict]) -> dict:
             system=load_prompt("general_legal_v2.txt"),
             user=user,
             temperature=0.3,
-            max_tokens=420,
+            max_tokens=1000,
+            reasoning_effort="low",
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("general reply failed: %s", e)
@@ -120,14 +115,18 @@ def _general(question: str, history: list[dict]) -> dict:
 
 
 def answer(question: str, history: list[dict]) -> dict:
-    # Decide how to handle this turn before touching the corpus, so greetings,
-    # meta questions and off-topic chatter don't trigger case retrieval.
     mode = chat_intake_mod.classify(question, history)
     if mode == "smalltalk":
-        return _smalltalk(question, history)
-    if mode == "general":
-        return _general(question, history)
-    return _grounded(question, history)
+        result = _smalltalk(question, history)
+    elif mode == "general":
+        result = _general(question, history)
+    else:
+        result = _grounded(question, history)
+    from textutil import normalize_text
+
+    if isinstance(result.get("answer"), str):
+        result["answer"] = normalize_text(result["answer"])
+    return result
 
 
 def _grounded(question: str, history: list[dict]) -> dict:
@@ -135,7 +134,7 @@ def _grounded(question: str, history: list[dict]) -> dict:
 
     rq = _retrieval_query(question, history)
     reformulated = reformulate_mod.reformulate(rq)
-    result = retrieval_mod.retrieve(reformulated, rq)  # may raise FileNotFoundError
+    result = retrieval_mod.retrieve(reformulated, rq)
 
     cases = _dedupe_cases(result)
     weak = result.max_similarity < s.similarity_threshold
@@ -145,10 +144,11 @@ def _grounded(question: str, history: list[dict]) -> dict:
         convo += f"{h.get('role', 'user').upper()}: {h.get('content', '')}\n"
 
     system = load_prompt("legal_qa_system_v1.txt")
-    user = (
+    context_block = _format_context(result)
+    base_user = (
         f"CONVERSATION SO FAR:\n{convo or '(none)'}\n\n"
         "RETRIEVED CASES (the ONLY permissible basis for legal statements):\n"
-        f"{_format_context(result)}\n\n"
+        f"{context_block}\n\n"
         f"USER QUESTION: {question}\n\n"
         + (
             "Note: retrieval was weak for this question — be upfront that you "
@@ -159,22 +159,68 @@ def _grounded(question: str, history: list[dict]) -> dict:
         + "Answer grounded only in the retrieved cases."
     )
 
-    try:
-        text = complete(
-            model=s.reasoning_model,
-            system=system,
-            user=user,
-            temperature=0.25,
-            max_tokens=800,
-        ).strip()
-    except Exception as e:  # noqa: BLE001
-        log.error("Legal QA failed: %s", e)
-        text = "I'm unable to answer that right now. Please try again shortly."
+    _ERR = "I'm unable to answer that right now. Please try again shortly."
+
+    def _draft(user: str) -> str | None:
+        try:
+            return complete(
+                model=s.reasoning_model,
+                system=system,
+                user=user,
+                temperature=0.25,
+                max_tokens=1600,
+                reasoning_effort="low",
+            ).strip()
+        except Exception as e:  # noqa: BLE001
+            log.error("Legal QA failed: %s", e)
+            return None
+
+    text = _draft(base_user)
+    validation = validator_mod.public_view(validator_mod._pass(ok=False))
+
+    if text is None:
+        text = _ERR
+    else:
+        crit = validator_mod.review(
+            question=question,
+            context_block=context_block,
+            draft=text,
+            result=result,
+        )
+        validation = validator_mod.public_view(crit)
+        if crit["verdict"] == "revise" and crit["ok"]:
+            revise_user = (
+                base_user
+                + "\n\nA REVIEWER FLAGGED YOUR PREVIOUS DRAFT. Fix these issues: "
+                + crit["feedback"]
+                + "\nGround every legal statement strictly in the cases above. Remove "
+                "or plainly qualify anything they do not squarely support, and do not "
+                "overstate a case beyond what it decided. If the cases do not actually "
+                "answer the question, say so. Rewrite the full answer."
+            )
+            revised = _draft(revise_user)
+            if revised:
+                text = revised
+                validation["revised"] = True
+                crit = validator_mod.review(
+                    question=question,
+                    context_block=context_block,
+                    draft=text,
+                    result=result,
+                )
+                validation = validator_mod.public_view(crit)
+                validation["revised"] = True
+
+    caution = validation.get("verdict") == "revise" or not validation.get(
+        "checks", {}
+    ).get("citation_outcomes_ok", True)
 
     return {
         "answer": text,
         "cited_cases": cases,
         "weak_retrieval": weak,
+        "grounding_caution": caution,
         "max_similarity": round(result.max_similarity, 4),
         "mode": "case_law",
+        "validation": validation,
     }

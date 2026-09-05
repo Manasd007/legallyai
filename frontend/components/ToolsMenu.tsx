@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { ScalesIcon, ChatIcon, BookIcon } from "@/components/ui";
 
 const TOOLS = [
-  { href: "/workspace?tab=assess", name: "Assess a case", desc: "Predict, read docs & chat", icon: ScalesIcon },
-  { href: "/workspace?tab=ask", name: "Ask a question", desc: "Chat grounded in precedent", icon: ChatIcon },
-  { href: "/workspace?tab=law", name: "Find the law", desc: "Acts & sections that apply", icon: BookIcon },
+  { href: "/workspace/assess", name: "Assess a case", desc: "Predict, read docs & chat", icon: ScalesIcon },
+  { href: "/workspace/ask", name: "Ask a question", desc: "Chat grounded in precedent", icon: ChatIcon },
+  { href: "/workspace/law", name: "Find the law", desc: "Acts & sections that apply", icon: BookIcon },
 ];
 
 export function ToolsMenu() {
@@ -38,7 +38,7 @@ export function ToolsMenu() {
       </button>
 
       {open && (
-        <div className="absolute left-1/2 top-full z-50 mt-3 w-72 -translate-x-1/2 rounded-2xl border border-ink/10 bg-surface/95 p-2 shadow-lift backdrop-blur">
+        <div className="absolute left-1/2 top-full z-50 mt-3 w-72 -translate-x-1/2 rounded border-2 border-ink bg-surface/90 p-2 shadow-brutal backdrop-blur-md">
           {TOOLS.map((t) => {
             const Icon = t.icon;
             return (
@@ -46,9 +46,9 @@ export function ToolsMenu() {
                 key={t.href}
                 href={t.href}
                 onClick={() => setOpen(false)}
-                className="flex items-start gap-3 rounded-xl p-2.5 transition hover:bg-ink/5"
+                className="flex items-start gap-3 rounded border-2 border-transparent p-2.5 transition hover:border-ink hover:bg-ink/5"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-navy-900 text-gold-400">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-ink bg-navy-900 text-gold-400">
                   <Icon className="h-5 w-5" />
                 </span>
                 <span>
