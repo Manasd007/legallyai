@@ -1,9 +1,3 @@
-"""In-memory store for analyzed documents (text + analysis + chat history).
-
-v1 is per-process and ephemeral — it resets on restart, which matches the
-"cached doc context" UX (analyze once, then chat within the session). Swap for
-Supabase/Redis when running multiple workers or wanting persistence.
-"""
 from __future__ import annotations
 
 import time
@@ -22,7 +16,7 @@ def put(filename: str, text: str, analysis: dict) -> str:
         "text": text,
         "char_count": len(text),
         "analysis": analysis,
-        "history": [],  # list of {"role": "user"|"assistant", "content": str}
+        "history": [],
         "created": time.time(),
     }
     return doc_id

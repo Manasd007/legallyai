@@ -1,10 +1,3 @@
-"""System prompt and spoken lines for the Legally AI Voice agent.
-
-Everything here is written FOR THE EAR (context doc §4.6): short sentences, no
-lists, no legalese dumps. The grounding rules implement §4.4 — legal claims must
-trace to retrieved passages, weak retrieval must be hedged aloud, and the full
-citations go to the post-call text summary, not the audio channel.
-"""
 from __future__ import annotations
 
 import random
@@ -113,11 +106,6 @@ CONVERSATION
   missing point back in naturally if it still matters.
 """
 
-# Spoken while legal_search runs in parallel (§3.2: never dead air, never a
-# robotic "please wait"). One is picked at random and pushed straight to TTS
-# the moment the tool call starts, so retrieval time is hidden behind speech.
-# These bypass the LLM entirely, so they must be selected by language here —
-# otherwise an English caller hears a Hindi filler before an English answer.
 
 
 def pick_ack(lang_code: str | None = None) -> str:
@@ -125,8 +113,6 @@ def pick_ack(lang_code: str | None = None) -> str:
 
 
 def recovery_line(kind: str, lang_code: str | None = None) -> str:
-    """Spoken recovery for failure paths (§4.8), when a stage fails outright and
-    the LLM never got a chance to respond."""
     return profile_for(lang_code).recovery[kind]
 
 

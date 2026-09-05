@@ -18,7 +18,7 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
  return (
  <button
  onClick={copy}
- className="inline-flex items-center gap-1.5 rounded-lg border border-ink/15 bg-surface/60 px-3 py-1.5 text-xs font-medium text-ink/70 transition hover:border-ink/30 hover:text-ink"
+ className="inline-flex items-center gap-1.5 rounded border-2 border-ink bg-surface/60 px-3 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-ink/70 shadow-brutal-sm backdrop-blur-sm transition hover:-translate-x-[1px] hover:-translate-y-[1px] hover:text-ink active:translate-x-0 active:translate-y-0 active:shadow-none"
  >
  {copied ? (
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"

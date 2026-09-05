@@ -3,14 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 
-/* Auth state for the whole app. Wraps Supabase Auth so components just read
-   `useAuth()` — they never touch the client directly. When Supabase isn't
-   configured the app still works signed-out (history simply isn't saved). */
 
 type AuthUser = { id: string; email: string | null };
 
-/* Build an absolute redirect URL from a path like "/predict". Supabase needs an
-   absolute URL, and it must be in the project's allowed Redirect URLs list. */
 function resolveRedirect(redirectTo?: string): string | undefined {
   if (typeof window === "undefined") return undefined;
   if (!redirectTo) return window.location.origin;
@@ -19,11 +14,8 @@ function resolveRedirect(redirectTo?: string): string | undefined {
 
 type Ctx = {
   user: AuthUser | null;
-  /** True until we've checked for an existing session (avoids a flash). */
   ready: boolean;
-  /** Whether Supabase is configured at all. */
   enabled: boolean;
-  /** Email magic-link sign-in. `redirectTo` is where the link lands them. */
   signInWithEmail: (email: string, redirectTo?: string) => Promise<void>;
   signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -40,7 +32,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setReady(true);
       return;
     }
-    // Read any persisted session, then subscribe to future changes.
     supabase.auth.getSession().then(({ data }) => {
       const u = data.session?.user;
       setUser(u ? { id: u.id, email: u.email ?? null } : null);

@@ -1,9 +1,3 @@
-"""Query result cache (brief §16).
-
-Free LLM tiers cap throughput, so repeated/similar queries should hit a cache
-keyed on the reformulated query. v1 uses a simple in-process TTL dict; swap for
-Redis/Supabase when running multiple workers.
-"""
 from __future__ import annotations
 
 import hashlib

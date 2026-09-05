@@ -4,13 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
-/* Ambient background: a slow WebGL "color bends" wash (react-bits ColorBends,
-   three.js) behind everything — gentle ribbons that drift on their own. The
-   palette flips with the theme (warm gold in light, cool sage/jade in dark to
-   match the dark accent). Non-interactive, behind content, and disabled under
-   prefers-reduced-motion. */
 
-// Client-only: three.js touches the GPU, so never render it on the server.
 const ColorBends = dynamic(() => import("@/components/ColorBends"), { ssr: false });
 
 export function Background() {
@@ -18,7 +12,6 @@ export function Background() {
   const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
-  // Mirror the app's `dark` class on <html> so we flip with the theme toggle.
   useEffect(() => {
     setMounted(true);
     const root = document.documentElement;
@@ -29,10 +22,8 @@ export function Background() {
     return () => observer.disconnect();
   }, []);
 
-  // Render in both themes; only skip under reduced motion / before mount.
   if (!mounted || reduce) return null;
 
-  // Warm gold in light, cool sage/jade in dark (matches the dark accent ramp).
   const palette = isDark
     ? { colors: ["#9db2a3", "#b5c8bc", "#afc4b6"], noise: 0, intensity: 0.7 }
     : { colors: ["#bd9148", "#d4ad68", "#9e7634"], noise: 0.1, intensity: 1.1 };

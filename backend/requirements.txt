@@ -6,6 +6,7 @@ python-dotenv>=1.0
 
 # LLM routing + fallback (Groq / Gemini / OpenRouter behind one interface)
 litellm>=1.40
+tenacity>=8.2            # backoff retries for litellm num_retries (free-tier 429s)
 
 # Document analysis (upload -> extract -> analyze -> chat)
 python-multipart>=0.0.9   # FastAPI file uploads
@@ -26,6 +27,7 @@ numpy>=1.26
 faiss-cpu>=1.8
 pandas>=2.2
 pyarrow>=15.0
+rank-bm25>=0.2.2          # lexical BM25 leg of hybrid retrieval (fused with dense via RRF)
 
 # Artifact hosting — pull the FAISS index + classifier from the Hugging Face
 # Hub on startup (instead of rebuilding) when they aren't present locally.

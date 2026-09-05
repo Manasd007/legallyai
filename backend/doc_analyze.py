@@ -1,14 +1,3 @@
-"""Analyze + chat over an uploaded legal document.
-
-Both are grounded ONLY in the document's own text (not the case-law corpus).
-analyze() returns a structured, ADVICE-FIRST breakdown (where you stand, deadlines,
-recommended actions, options, risks); chat() answers follow-ups from the cached text.
-
-The document text is UNTRUSTED user input. It is wrapped in explicit data delimiters,
-sanitized so it cannot break out of them, and the model is instructed never to follow
-instructions embedded in it. A light server-side heuristic flags likely prompt-injection
-so the UI can show a security note.
-"""
 from __future__ import annotations
 
 import json
@@ -20,12 +9,9 @@ from llm import complete
 
 log = logging.getLogger("legally.doc")
 
-# Boundary markers that wrap the untrusted document for the model. The doc text is
-# stripped of any literal occurrence of these so it cannot forge the boundary.
 DOC_OPEN = "=====BEGIN UNTRUSTED DOCUMENT====="
 DOC_CLOSE = "=====END UNTRUSTED DOCUMENT====="
 
-# Phrases that commonly signal an attempt to hijack the model from inside the data.
 _INJECTION_PATTERNS = [
     r"ignore (?:all|any|the|your|previous|prior|above)[\w ,]{0,40}instruction",
     r"disregard[\w ,]{0,40}(?:instruction|prompt|rule|above)",
@@ -47,13 +33,10 @@ _CONFIDENCE = {"high", "medium", "low"}
 
 
 def detect_injection(text: str) -> bool:
-    """True if the text looks like it contains prompt-injection / jailbreak attempts."""
     return bool(_INJECTION_RE.search(text or ""))
 
 
 def _sanitize_doc(text: str) -> str:
-    """Neutralize attempts to forge the data boundary by stripping any literal
-    occurrence of the delimiter markers from the untrusted text."""
     for marker in (DOC_OPEN, DOC_CLOSE):
         text = re.sub(re.escape(marker), " ", text, flags=re.IGNORECASE)
     return text
@@ -64,9 +47,6 @@ def _wrap(text: str) -> str:
 
 
 def _select_relevant(text: str, question: str, budget: int) -> str:
-    """For long docs, pick the chunks most relevant to the question (keyword
-    overlap) so chat works on the WHOLE document, not just its first pages.
-    Chosen chunks are returned in original order to preserve coherence."""
     if len(text) <= budget:
         return text
 
@@ -86,7 +66,7 @@ def _select_relevant(text: str, question: str, budget: int) -> str:
             continue
         chosen.append(i)
         total += len(chunks[i])
-    if not chosen:  # question had no usable terms — fall back to the start
+    if not chosen:
         return text[:budget]
     chosen.sort()
     return "\n…\n".join(chunks[i] for i in chosen)
@@ -175,7 +155,6 @@ def _normalize(data: dict, truncated: bool, injection_flag: bool) -> dict:
     if confidence not in _CONFIDENCE:
         confidence = ""
 
-    # The model may flag injection; the server heuristic is an independent backstop.
     warning = _str(data.get("injection_warning", "")).strip()
     if injection_flag and not warning:
         warning = (
@@ -242,7 +221,8 @@ def analyze(text: str) -> dict:
                 user=user if attempt == 0 else user + "\n\nReturn VALID JSON ONLY.",
                 temperature=0.2,
                 json_mode=True,
-                max_tokens=2400,
+                max_tokens=3200,
+                reasoning_effort="low",
             )
             return _normalize(json.loads(_strip_fences(raw)), truncated, injection_flag)
         except json.JSONDecodeError as e:
@@ -256,8 +236,6 @@ def analyze(text: str) -> dict:
 
 def chat(doc: dict, question: str, history: list[dict]) -> str:
     s = get_settings()
-    # For long documents, send the chunks most relevant to THIS question rather
-    # than a truncated prefix, so follow-ups about later sections still work.
     text = _sanitize_doc(_select_relevant(doc["text"], question, s.doc_max_chars))
     system = load_prompt("doc_chat_system_v2.txt")
 
@@ -278,7 +256,8 @@ def chat(doc: dict, question: str, history: list[dict]) -> str:
             system=system,
             user=user,
             temperature=0.2,
-            max_tokens=750,
+            max_tokens=1500,
+            reasoning_effort="low",
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("Doc chat failed: %s", e)
@@ -286,8 +265,6 @@ def chat(doc: dict, question: str, history: list[dict]) -> str:
 
 
 def explain_term(doc: dict, term: str) -> str:
-    """Plain-language explanation of a single legal term, using the document only for
-    context on how the term is used. General definitional info, not advice."""
     s = get_settings()
     term = (term or "").strip()[:120]
     if not term:
@@ -307,7 +284,8 @@ def explain_term(doc: dict, term: str) -> str:
             system=system,
             user=user,
             temperature=0.2,
-            max_tokens=320,
+            max_tokens=700,
+            reasoning_effort="low",
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("Doc term explanation failed: %s", e)

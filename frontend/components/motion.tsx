@@ -10,10 +10,8 @@ import {
 } from "framer-motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-/* A single calm easing curve used everywhere (out-expo-ish). No springs. */
 export const EASE = [0.22, 1, 0.36, 1] as const;
 
-/* ----------------------------- Reveal on scroll --------------------------- */
 
 export function Reveal({
   children,
@@ -43,7 +41,6 @@ export function Reveal({
   );
 }
 
-/* ----------------------------- Staggered group ---------------------------- */
 
 export function Stagger({
   children,
@@ -92,10 +89,8 @@ export function StaggerItem({
   );
 }
 
-/* ------------------------------- Gold hairline ---------------------------- */
-/* The signature eyebrow line that draws itself in. */
 
-export function GoldLine({ className = "h-px w-6 bg-gold-500" }: { className?: string }) {
+export function GoldLine({ className = "h-0.5 w-6 bg-gold-500" }: { className?: string }) {
   const reduce = useReducedMotion();
   return (
     <motion.span
@@ -108,7 +103,6 @@ export function GoldLine({ className = "h-px w-6 bg-gold-500" }: { className?: s
   );
 }
 
-/* ----------------------------- Animated meter ----------------------------- */
 
 export function MotionBar({
   pct,
@@ -131,7 +125,6 @@ export function MotionBar({
   );
 }
 
-/* -------------------------------- Count up -------------------------------- */
 
 export function CountUp({
   to,
@@ -171,9 +164,6 @@ export function CountUp({
   );
 }
 
-/* ------------------------------ Word rotator ------------------------------ */
-/* Harvey-style vertical word cycler ("…built for [Employment]"). The slot is
-   sized to the longest word so the surrounding text never reflows. */
 
 export function Rotator({
   items,
@@ -195,7 +185,6 @@ export function Rotator({
 
   return (
     <span className={`relative inline-grid overflow-hidden align-bottom ${className ?? ""}`}>
-      {/* Invisible sizer keeps width/height stable across the longest item. */}
       <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-nowrap">
         {items.reduce((a, b) => (a.length >= b.length ? a : b), "")}
       </span>
@@ -215,9 +204,6 @@ export function Rotator({
   );
 }
 
-/* -------------------------------- Marquee --------------------------------- */
-/* Infinite horizontal scroll. Renders two identical rows and shifts the track
-   by -50%, so the loop is seamless. Pauses for reduced-motion users. */
 
 export function Marquee({
   items,
@@ -233,7 +219,7 @@ export function Marquee({
         {doubled.map((t, idx) => (
           <span
             key={`${t}-${idx}`}
-            className="inline-flex items-center whitespace-nowrap rounded-full border border-ink/10 bg-surface/60 px-4 py-1.5 text-sm text-ink/60"
+            className="inline-flex items-center whitespace-nowrap rounded border-2 border-ink/20 bg-surface/50 px-4 py-1.5 font-mono text-xs uppercase tracking-[0.08em] text-ink/60 backdrop-blur-sm"
           >
             {t}
           </span>
@@ -243,11 +229,6 @@ export function Marquee({
   );
 }
 
-/* --------------------------- Masked text reveal --------------------------- */
-/* Port of the Framer "MaskedTextReveal" module (JqfehL). Each word sits in an
-   overflow-hidden mask; the word itself slides up from `fromY`, un-rotates from
-   `rotateFrom`, and de-blurs, staggered word-by-word. Reduced-motion users get
-   the final state immediately. Words listed in `highlight` render in gold. */
 
 const REVEAL_EASE = [0, 0.75, 0.25, 0.98] as const;
 
@@ -341,8 +322,6 @@ export function MaskedTextReveal({
   );
 }
 
-/* ------------------------- Lightweight fade wrapper ----------------------- */
-/* For freshly-mounted content (e.g. query results) already in the viewport. */
 
 export function FadeUp({
   children,

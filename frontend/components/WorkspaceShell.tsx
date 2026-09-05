@@ -17,25 +17,18 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
  const { user, ready, enabled } = useAuth();
  const [open, setOpen] = useState(false);
 
- // Freeze the page (and Lenis) while the mobile drawer is open.
  useScrollLock(open);
 
- // Close the mobile drawer whenever the route changes.
  useEffect(() => {
  setOpen(false);
  }, [pathname]);
 
- // Auth guard: the workspace is for signed-in users. Send anyone signed out to
- // the login page, remembering where they were headed. Skipped entirely when
- // Supabase isn't configured (local dev), so the app still runs without auth.
  useEffect(() => {
  if (enabled && ready && !user) {
  router.replace(`/login?next=${encodeURIComponent(pathname)}`);
  }
  }, [enabled, ready, user, pathname, router]);
 
- // While checking the session, or while redirecting a signed-out user, show a
- // loader instead of flashing the workspace behind it.
  if (enabled && (!ready || !user)) {
  return (
  <div className="grid min-h-screen place-items-center">
@@ -46,15 +39,14 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
  return (
  <div className="min-h-screen">
- {/* Mobile top bar */}
- <div className="sticky top-0 z-40 flex items-center justify-between border-b border-ink/10 bg-parchment/85 px-4 py-3 backdrop-blur lg:hidden">
+ <div className="sticky top-0 z-40 flex items-center justify-between border-b-2 border-ink bg-parchment/85 px-4 py-3 backdrop-blur-md lg:hidden">
  <Logo withText textClassName="text-2xl" />
  <div className="flex items-center gap-2">
  <ThemeToggle />
  <button
  onClick={() => setOpen(true)}
  aria-label="Open workspace menu"
- className="grid h-9 w-9 place-items-center rounded-lg border border-ink/15 bg-surface/60 text-ink/70"
+ className="grid h-9 w-9 place-items-center rounded border-2 border-ink bg-surface/60 text-ink/70"
  >
  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
  strokeLinecap="round" className="h-5 w-5" aria-hidden>
@@ -64,24 +56,20 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
  </div>
  </div>
 
- {/* Desktop sidebar, fixed */}
- <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-ink/10 bg-surface/60 backdrop-blur lg:flex">
+ <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r-2 border-ink bg-surface/55 backdrop-blur-md lg:flex">
  <SidebarContent />
  </aside>
 
- {/* Mobile drawer */}
  {open && (
  <div className="fixed inset-0 z-50 lg:hidden">
  <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={() => setOpen(false)} />
- <aside data-lenis-prevent className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col overflow-y-auto border-r border-ink/10 bg-parchment shadow-lift">
+ <aside data-lenis-prevent className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col overflow-y-auto border-r-2 border-ink bg-parchment shadow-lift">
  <SidebarContent onNavigate={() => setOpen(false)} />
  </aside>
  </div>
  )}
 
-      {/* Main content, offset by the sidebar on desktop */}
       <div className="relative min-h-screen lg:pl-72">
-        {/* Soften the animated bg behind workspace tools without hiding it entirely */}
         <div
           aria-hidden
           className="pointer-events-none fixed inset-y-0 left-0 right-0 z-0 bg-parchment/30 backdrop-blur-[10px] lg:left-72"
@@ -108,7 +96,6 @@ function SidebarContent({
 
  <MatterPanel onNavigate={onNavigate} />
 
- {/* Past sessions — grows to fill space and scrolls independently. */}
  <HistoryPanel onNavigate={onNavigate} />
 
  <div className="mt-auto flex flex-col gap-2">
@@ -134,28 +121,28 @@ function MatterPanel({ onNavigate }: { onNavigate?: () => void }) {
  const { matter, newSession, ready } = useSession();
 
  if (!ready) {
- return <div className="h-20 animate-pulse rounded-xl bg-ink/5" />;
+ return <div className="h-20 animate-pulse rounded border-2 border-ink/10 bg-ink/5" />;
  }
 
  if (!matter) {
  return (
- <div className="rounded-xl border border-dashed border-ink/15 bg-surface/40 p-3.5 text-xs leading-relaxed text-ink/55">
- <div className="font-semibold text-ink/70">No matter yet</div>
- Describe your situation in any tab and it will follow you across the session.
+ <div className="rounded border-2 border-dashed border-ink/25 bg-surface/40 p-3.5 text-xs leading-relaxed text-ink/55">
+ <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/70">No matter yet</div>
+ <p className="mt-1">Describe your situation in any tab and it will follow you across the session.</p>
  </div>
  );
  }
 
  function reset() {
  newSession();
- router.push("/workspace");
+ router.push("/workspace/assess");
  onNavigate?.();
  }
 
  return (
- <div className="rounded-xl border border-gold-500/30 bg-gold-400/[0.07] p-3.5">
+ <div className="rounded border-2 border-gold-500/60 bg-gold-400/[0.08] p-3.5">
  <div className="flex items-center justify-between">
- <span className="text-[11px] font-semibold uppercase tracking-wider text-gold-700">
+ <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-700">
  Your matter
  </span>
  <button

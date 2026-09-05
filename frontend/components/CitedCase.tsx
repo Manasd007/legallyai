@@ -46,7 +46,7 @@ export function CitedCase({ c }: { c: CaseLike }) {
  const highlightId = c.source?.chunk_id ?? c.chunk_id;
 
  return (
- <div className="rounded-xl border border-ink/10 bg-surface/60">
+ <div className="rounded border-2 border-ink bg-surface/55 backdrop-blur-sm">
  {showFull && (
  <CaseModal
  citation={c.citation}
@@ -58,7 +58,7 @@ export function CitedCase({ c }: { c: CaseLike }) {
  <button
  onClick={() => setShowFull(true)}
  title="Open the full judgment with the cited passage highlighted"
- className="group flex w-full items-start justify-between gap-3 rounded-t-xl px-4 py-3 text-left transition hover:bg-ink/[0.03]"
+ className="group flex w-full items-start justify-between gap-3 rounded-t px-4 py-3 text-left transition hover:bg-ink/[0.03]"
  >
  <div className="min-w-0">
  <div className="flex items-center gap-1.5">
@@ -86,7 +86,7 @@ export function CitedCase({ c }: { c: CaseLike }) {
  </button>
 
  {excerpt && (
- <div className="border-t border-ink/10 px-4 py-2">
+ <div className="border-t-2 border-ink/15 px-4 py-2">
  <button
  onClick={() => setOpen((v) => !v)}
  className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 transition hover:text-gold-600"
@@ -103,17 +103,17 @@ export function CitedCase({ c }: { c: CaseLike }) {
  <div className="mt-2 space-y-2">
  <div className="flex flex-wrap items-center gap-2">
  {role && (
- <span className="rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-medium text-ink/60">
+ <span className="rounded border-2 border-ink/20 bg-ink/5 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-ink/60">
  {role}
  </span>
  )}
  {outcome && (
- <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${outcomeTone(outcome)}`}>
+ <span className={`rounded border-2 border-current px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] ${outcomeTone(outcome)}`}>
  {outcome}
  </span>
  )}
  </div>
- <blockquote className="max-h-48 overflow-auto rounded-lg border-l-2 border-gold-400 bg-ink/[0.03] px-3 py-2 text-xs leading-relaxed text-ink/70">
+ <blockquote className="max-h-48 overflow-auto rounded border-l-4 border-gold-500 bg-ink/[0.03] px-3 py-2 text-xs leading-relaxed text-ink/70">
  “{excerpt}”
  </blockquote>
  <p className="text-[11px] text-ink/40">
@@ -145,10 +145,10 @@ export function TrustBadge({ verified, fabricated }: { verified: number; fabrica
  const clean = fabricated === 0;
  return (
  <div
- className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+ className={`inline-flex items-center gap-2 rounded border-2 px-3 py-1.5 text-xs font-semibold ${
  clean
- ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"
- : "border-gold-500/30 bg-gold-400/10 text-gold-700"
+ ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700"
+ : "border-gold-500/50 bg-gold-400/10 text-gold-700"
  }`}
  >
  <CheckBadge />

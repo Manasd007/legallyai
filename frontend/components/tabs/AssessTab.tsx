@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Mic } from "lucide-react";
 import { ArrowIcon, ScalesIcon, DocIcon } from "@/components/ui";
 import { useSession } from "@/components/session";
-import { useVoiceSession, voiceEnabled, type CallResult } from "@/components/voice/useVoiceSession";
+import { useVoiceSession, useVoiceEnabled, type CallResult } from "@/components/voice/useVoiceSession";
 import { VoiceBar } from "@/components/voice/VoiceBar";
 import { LiveTurns } from "@/components/voice/LiveTurns";
 import { VoiceSummary } from "@/components/VoiceSummary";
@@ -13,6 +13,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { CitedCase as CitedCaseCard, TrustBadge } from "@/components/CitedCase";
 import { postJson, readJsonResponse, authHeaders } from "@/components/api";
 import { DocAnalysisView, type Analysis } from "@/components/DocAnalysis";
+import { TabIntro } from "@/components/tabs/TabIntro";
 import type { StoredMessage } from "@/components/tabs/types";
 
 type Source = {
@@ -479,14 +480,18 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col">
       {zeroState ? (
-        <div className="flex flex-1 flex-col justify-center py-8">
-          <Intro
-            matter={matter ?? undefined}
-            onExample={(ex) => setInput(ex)}
-            onUseMatter={() => matter && setInput(matter)}
-            composer={composer}
-          />
-        </div>
+        <TabIntro
+          icon={ScalesIcon}
+          title="What happened?"
+          subtitle="Describe your situation and we'll tell you where you likely stand, grounded in how real Supreme Court cases were decided. Or attach a contract, notice, or order."
+          composer={composer}
+          matter={matter}
+          onUseMatter={() => matter && setInput(matter)}
+          examples={EXAMPLES.map((ex) => ({
+            label: ex.length > 52 ? ex.slice(0, 52) + "…" : ex,
+            onClick: () => setInput(ex),
+          }))}
+        />
       ) : (
         <>
           <div className="flex justify-end">
@@ -549,7 +554,7 @@ function Row({ item, onFullAssessment }: { item: Item; onFullAssessment?: () => 
     );
   if (item.kind === "error")
     return (
-      <div className="rounded-xl border border-red-300 bg-red-500/[0.06] px-4 py-3 text-sm text-red-600 dark:text-red-300">
+      <div className="rounded border-2 border-red-400 bg-red-500/[0.06] px-4 py-3 text-sm text-red-600 dark:text-red-300">
         {item.content}
       </div>
     );
@@ -561,13 +566,13 @@ function UserBubble({ text, fileName }: { text: string; fileName?: string }) {
     <div className="flex justify-end">
       <div className="max-w-[85%] space-y-2">
         {fileName && (
-          <div className="ml-auto flex w-fit items-center gap-2 rounded-xl border border-ink/15 bg-surface/70 px-3 py-2 text-xs text-ink/70">
+          <div className="ml-auto flex w-fit items-center gap-2 rounded border-2 border-ink bg-surface/70 px-3 py-2 text-xs text-ink/70 backdrop-blur-sm">
             <DocIcon className="h-4 w-4 text-gold-600" />
             <span className="max-w-[200px] truncate">{fileName}</span>
           </div>
         )}
         {text && (
-          <div className="whitespace-pre-wrap rounded-2xl bg-navy-900 px-4 py-2.5 text-sm leading-relaxed text-cream">
+          <div className="whitespace-pre-wrap rounded border-2 border-ink bg-navy-900 px-4 py-2.5 text-sm leading-relaxed text-cream shadow-brutal-sm">
             {text}
           </div>
         )}
@@ -580,18 +585,18 @@ function AssistantText({ content, cases, weak }: { content: string; cases?: Chat
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] space-y-3">
-        <div className="whitespace-pre-wrap rounded-2xl border border-ink/10 bg-surface/70 px-4 py-3 text-sm leading-relaxed text-ink/85">
+        <div className="whitespace-pre-wrap rounded border-2 border-ink bg-surface/65 px-4 py-3 text-sm leading-relaxed text-ink/85 backdrop-blur-md">
           {weak && (
-            <div className="mb-2 inline-flex rounded-full bg-gold-400/15 px-2.5 py-0.5 text-[11px] font-medium text-gold-700">
+            <div className="mb-2 inline-flex rounded border-2 border-gold-500/50 bg-gold-400/15 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] text-gold-700">
               Limited matching cases
             </div>
           )}
           {content}
         </div>
         {cases && cases.length > 0 && (
-          <div className="rounded-2xl border border-ink/10 bg-surface/50 px-4 py-3">
+          <div className="rounded border-2 border-ink bg-surface/45 px-4 py-3 backdrop-blur-md">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink/55">
+              <div className="flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">
                 <ScalesIcon className="h-4 w-4 text-gold-600" /> Cases this answer is based on
               </div>
               <TrustBadge verified={cases.length} fabricated={0} />
@@ -621,15 +626,15 @@ function DocFollowUp({
   if (questions.length === 0 && !analysis.your_position && !analysis.summary) return null;
 
   return (
-    <div className="card border border-gold-500/30 bg-gold-400/[0.05]">
-      <div className="text-xs font-semibold uppercase tracking-wider text-gold-700">
+    <div className="card border-2 border-gold-500/50 bg-gold-400/[0.05]">
+      <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-700">
         Keep going with this document
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onAssess(analysis)}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-navy-900 px-3.5 py-1.5 text-xs font-semibold text-cream transition hover:bg-navy-800"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded border-2 border-ink bg-navy-900 px-3.5 py-1.5 text-xs font-semibold text-cream shadow-brutal-sm transition hover:-translate-x-[1px] hover:-translate-y-[1px] hover:shadow-brutal active:translate-x-0 active:translate-y-0 active:shadow-none"
         >
           <ScalesIcon className="h-3.5 w-3.5 text-gold-400" /> Assess this as a case
         </button>
@@ -638,59 +643,9 @@ function DocFollowUp({
             key={q}
             type="button"
             onClick={() => onAsk(analysis.doc_id, q)}
-            className="cursor-pointer rounded-full border border-ink/20 bg-surface px-3.5 py-1.5 text-left text-xs font-medium text-ink/80 transition hover:border-gold-500/40 hover:bg-gold-400/10 hover:text-ink"
+            className="cursor-pointer rounded border-2 border-ink/25 bg-surface px-3.5 py-1.5 text-left text-xs font-medium text-ink/80 transition hover:border-ink hover:bg-gold-400/10 hover:text-ink"
           >
             {q}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Intro({
-  matter,
-  onExample,
-  onUseMatter,
-  composer,
-}: {
-  matter?: string;
-  onExample: (ex: string) => void;
-  onUseMatter: () => void;
-  composer: React.ReactNode;
-}) {
-  return (
-    <div>
-      <h2 className="text-center font-serif text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-        What happened?
-      </h2>
-      <p className="mx-auto mt-2 max-w-xl text-center text-sm leading-relaxed text-ink/60">
-        Describe your situation and we&apos;ll tell you where you likely stand, grounded in how
-        real Supreme Court cases were decided. Or attach a contract, notice, or order.
-      </p>
-
-      <div className="mt-6">{composer}</div>
-
-      {matter && (
-        <button
-          onClick={onUseMatter}
-          className="mt-4 block w-full rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-3 text-left text-sm transition hover:border-gold-500/50"
-        >
-          <span className="block text-[11px] font-semibold uppercase tracking-wider text-gold-700">
-            Continue your matter
-          </span>
-          <span className="mt-0.5 line-clamp-2 text-ink/70">{matter}</span>
-        </button>
-      )}
-
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        {EXAMPLES.map((ex) => (
-          <button
-            key={ex}
-            onClick={() => onExample(ex)}
-            className="rounded-full border border-ink/15 bg-surface/60 px-3.5 py-1.5 text-left text-xs text-ink/65 transition hover:border-ink/30 hover:text-ink"
-          >
-            {ex.length > 52 ? ex.slice(0, 52) + "…" : ex}
           </button>
         ))}
       </div>
@@ -720,6 +675,7 @@ function Composer({
   fileRef: React.RefObject<HTMLInputElement>;
 }) {
   const canSend = !loading && (input.trim().length > 0 || !!pendingFile);
+  const voiceEnabled = useVoiceEnabled();
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -736,20 +692,20 @@ function Composer({
           aria-hidden
           className="pointer-events-none absolute -inset-px -z-10 rounded-[1.35rem] bg-[radial-gradient(120%_140%_at_50%_120%,rgba(var(--c-gold-500),0.22),transparent_70%)] opacity-0 blur-md transition-opacity duration-300 group-focus-within:opacity-100"
         />
-        <div className="relative overflow-hidden rounded-[1.3rem] border border-ink/15 bg-surface/80 shadow-card backdrop-blur-md transition-colors duration-200 focus-within:border-gold-500/45">
+        <div className="relative overflow-hidden rounded border-2 border-ink bg-surface/70 shadow-brutal-sm backdrop-blur-md transition-[box-shadow] duration-200 focus-within:shadow-brutal">
           <div
             aria-hidden
             className="absolute inset-x-0 top-0 h-px scale-x-0 bg-gradient-to-r from-transparent via-gold-500/60 to-transparent transition-transform duration-300 group-focus-within:scale-x-100"
           />
 
           {pendingFile && (
-            <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded-xl border border-gold-500/25 bg-gold-500/[0.06] px-3 py-2 text-xs text-ink/80">
+            <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded border-2 border-gold-500/40 bg-gold-500/[0.06] px-3 py-2 text-xs text-ink/80">
               <DocIcon className="h-4 w-4 shrink-0 text-gold-600" />
               <span className="min-w-0 flex-1 truncate">{pendingFile.name}</span>
               <button
                 onClick={onClearFile}
                 aria-label="Remove file"
-                className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-ink/40 transition hover:bg-ink/10 hover:text-ink"
+                className="grid h-5 w-5 shrink-0 place-items-center rounded border-2 border-transparent text-ink/40 transition hover:border-ink hover:bg-ink/10 hover:text-ink"
               >
                 ✕
               </button>
@@ -762,7 +718,7 @@ function Composer({
               onClick={() => fileRef.current?.click()}
               aria-label="Attach a document"
               title="Attach a document"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink/45 transition hover:bg-ink/[0.06] hover:text-gold-600"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-transparent text-ink/45 transition hover:border-ink hover:bg-ink/[0.06] hover:text-gold-600"
             >
               <PaperclipIcon />
             </button>
@@ -796,7 +752,7 @@ function Composer({
                 onClick={onVoice}
                 aria-label="Start a voice conversation"
                 title="Talk instead of typing"
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink/45 transition hover:bg-ink/[0.06] hover:text-gold-600"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-transparent text-ink/45 transition hover:border-ink hover:bg-ink/[0.06] hover:text-gold-600"
               >
                 <Mic className="h-5 w-5" strokeWidth={1.8} aria-hidden />
               </button>
@@ -805,7 +761,7 @@ function Composer({
               onClick={onSend}
               disabled={!canSend}
               aria-label="Send"
-              className="group/send grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-onbrand shadow-sm ring-1 ring-inset ring-white/10 transition-all duration-200 hover:shadow-lift enabled:hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-40"
+              className="group/send grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-ink bg-brand text-onbrand shadow-brutal-sm transition-all duration-150 enabled:hover:-translate-x-[1px] enabled:hover:-translate-y-[1px] enabled:hover:shadow-brutal enabled:active:translate-x-0 enabled:active:translate-y-0 enabled:active:shadow-none disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ArrowIcon className="h-4 w-4 transition-transform duration-200 group-enabled/send:group-hover/send:translate-x-0.5" />
             </button>
@@ -836,7 +792,7 @@ function PaperclipIcon() {
 function Thinking() {
   return (
     <div className="flex justify-start">
-      <div className="rounded-2xl border border-ink/10 bg-surface/70 px-4 py-3">
+      <div className="rounded border-2 border-ink bg-surface/65 px-4 py-3 backdrop-blur-md">
         <span className="flex gap-1">
           {[0, 0.15, 0.3].map((d) => (
             <span
@@ -884,7 +840,7 @@ function Result({ res }: { res: QueryResponse }) {
   return (
     <section className="space-y-5">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-ink/45">Your assessment</span>
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">Your assessment</span>
         <CopyButton text={copyText} label="Copy assessment" />
       </div>
 
@@ -979,19 +935,19 @@ function confidenceSentence(confidence?: string): string {
 
 const TONE: Record<Stance["tone"], { chip: string; bar: string; ring: string }> = {
   good: {
-    chip: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+    chip: "bg-emerald-500/10 text-emerald-700 border-emerald-500/60",
     bar: "from-emerald-500 to-emerald-400",
-    ring: "border-emerald-500/20",
+    ring: "border-emerald-500/50",
   },
   neutral: {
-    chip: "bg-gold-400/15 text-gold-700 border-gold-500/30",
+    chip: "bg-gold-400/15 text-gold-700 border-gold-500/60",
     bar: "from-gold-500 to-gold-400",
-    ring: "border-ink/10",
+    ring: "border-ink",
   },
   bad: {
-    chip: "bg-red-500/10 text-red-600 border-red-500/30",
+    chip: "bg-red-500/10 text-red-600 border-red-500/60",
     bar: "from-red-500/80 to-red-400/80",
-    ring: "border-red-500/20",
+    ring: "border-red-500/50",
   },
 };
 
@@ -1017,12 +973,12 @@ function VerdictCard({
       : null;
 
   return (
-    <div className={`card overflow-hidden border ${tone.ring}`}>
-      <div className="text-xs font-semibold uppercase tracking-wider text-ink/50">Where you stand</div>
+    <div className={`card overflow-hidden border-2 ${tone.ring}`}>
+      <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/50">Where you stand</div>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <h2 className="max-w-xl font-serif text-2xl font-semibold leading-snug text-ink sm:text-3xl">{s.headline}</h2>
-        <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${tone.chip}`}>{s.word}</span>
+        <span className={`shrink-0 rounded border-2 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] ${tone.chip}`}>{s.word}</span>
       </div>
 
       {basis && <p className="mt-3 text-sm leading-relaxed text-ink/70">{basis}</p>}
@@ -1046,7 +1002,7 @@ function VerdictCard({
         </div>
       )}
 
-      <div className="mt-4 rounded-lg bg-ink/[0.04] p-3 text-xs leading-relaxed text-ink/65">
+      <div className="mt-4 rounded border-2 border-ink/15 bg-ink/[0.04] p-3 text-xs leading-relaxed text-ink/65">
         <span className="font-semibold text-ink/80">How sure are we? </span>
         {confidenceSentence(confidence)}
         {note && <span className="mt-1 block text-ink/55">{note}</span>}
@@ -1124,14 +1080,14 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
             The factors the analogous cases turned on, weighed against your situation.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold">
-          <span className="rounded-full bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">
+        <div className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]">
+          <span className="rounded border-2 border-emerald-500/50 bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
             {tally.favorable} for
           </span>
-          <span className="rounded-full bg-red-500/10 px-2 py-1 text-red-600 dark:text-red-300">
+          <span className="rounded border-2 border-red-500/50 bg-red-500/10 px-2 py-0.5 text-red-600 dark:text-red-300">
             {tally.unfavorable} against
           </span>
-          <span className="rounded-full bg-ink/5 px-2 py-1 text-ink/55">{tally.unclear} depends</span>
+          <span className="rounded border-2 border-ink/20 bg-ink/5 px-2 py-0.5 text-ink/55">{tally.unclear} depends</span>
         </div>
       </div>
 
@@ -1141,16 +1097,16 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
           return (
             <li
               key={i}
-              className={`flex items-start gap-3 rounded-lg border border-l-2 border-ink/10 bg-ink/[0.02] px-3.5 py-3 dark:bg-white/[0.02] ${m.rail}`}
+              className={`flex items-start gap-3 rounded border-2 border-l-[6px] border-ink/20 bg-ink/[0.02] px-3.5 py-3 dark:bg-white/[0.02] ${m.rail}`}
             >
-              <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md ${m.iconWrap}`}>
+              <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded border-2 border-ink/15 ${m.iconWrap}`}>
                 <FactorIcon kind={f.assessment} />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-sm font-semibold text-ink">{f.factor}</span>
                   <span
-                    className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset ${m.chip}`}
+                    className={`whitespace-nowrap rounded px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] ring-2 ring-inset ${m.chip}`}
                   >
                     {m.tag}
                   </span>
@@ -1167,7 +1123,7 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
 
 function NextSteps({ steps }: { steps: string[] }) {
   return (
-    <div className="card border border-gold-500/30 bg-gold-400/[0.06]">
+    <div className="card border-2 border-gold-500/50 bg-gold-400/[0.06]">
       <h2 className="font-serif text-lg font-semibold text-ink">What you can do next</h2>
       <p className="mt-1 text-xs text-ink/60">
         Concrete things that helped applicants in similar cases, worth discussing with an advocate.
@@ -1204,7 +1160,7 @@ function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> 
           return (
             <li
               key={i}
-              className="flex items-center justify-between gap-3 rounded-lg border border-ink/10 bg-surface/60 px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded border-2 border-ink/20 bg-surface/55 px-4 py-3 backdrop-blur-sm transition hover:border-ink"
             >
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-ink">{c.case_name}</div>
@@ -1213,8 +1169,8 @@ function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> 
               <div className="flex shrink-0 items-center gap-3">
                 <span className="text-xs tabular-nums text-ink/50">{Math.round(c.similarity * 100)}% similar</span>
                 <span
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    won ? "bg-emerald-500/10 text-emerald-700" : "bg-red-500/10 text-red-600"
+                  className={`rounded border-2 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                    won ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700" : "border-red-500/50 bg-red-500/10 text-red-600"
                   }`}
                 >
                   {won ? "Applicant won" : "Applicant lost"}
@@ -1267,8 +1223,8 @@ function MethodDisclosure({ ps }: { ps: Signals }) {
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {rows.map((r) => (
-          <div key={r.key} className="rounded-lg border border-ink/10 bg-surface/60 p-3">
-            <div className="text-xs font-semibold uppercase tracking-wider text-ink/50">{r.key}</div>
+          <div key={r.key} className="rounded border-2 border-ink/20 bg-surface/55 p-3 backdrop-blur-sm">
+            <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/50">{r.key}</div>
             <div className="mt-1.5 font-serif text-xl font-semibold text-ink">{r.value}</div>
             <div className="mt-1 text-[11px] leading-snug text-ink/55">{r.sub}</div>
           </div>
@@ -1281,8 +1237,8 @@ function MethodDisclosure({ ps }: { ps: Signals }) {
 function OutOfScope({ res }: { res: QueryResponse }) {
   return (
     <section className="space-y-4">
-      <div className="flex items-start gap-2 rounded-xl border border-gold-500/30 bg-gold-400/10 px-4 py-3 text-sm leading-relaxed text-ink/80">
-        <span className="mt-0.5 shrink-0 rounded-full bg-gold-400/30 px-2 py-0.5 text-[11px] font-semibold text-gold-700">
+      <div className="flex items-start gap-2 rounded border-2 border-gold-500/50 bg-gold-400/10 px-4 py-3 text-sm leading-relaxed text-ink/80">
+        <span className="mt-0.5 shrink-0 rounded border-2 border-gold-500/40 bg-gold-400/30 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-gold-700">
           Outside legal scope
         </span>
         <span>{res.message}</span>
@@ -1294,7 +1250,7 @@ function OutOfScope({ res }: { res: QueryResponse }) {
 
       {res.web_sources && res.web_sources.length > 0 && (
         <div className="card">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-ink/55">Sources from the web</h2>
+          <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">Sources from the web</h2>
           <ol className="mt-3 space-y-2">
             {res.web_sources.map((sourceItem, i) => (
               <li key={i} className="flex gap-2 text-sm">

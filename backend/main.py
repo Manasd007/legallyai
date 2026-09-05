@@ -1,13 +1,3 @@
-"""Legally AI — FastAPI app and routes (brief §9).
-
-Implements the full request lifecycle (brief §6):
-  router -> reformulate -> retrieve -> predict -> verify -> answer -> persist
-
-Designed to degrade gracefully:
-  * No LLM keys?  reformulation/router fall back; /api/retrieve still works.
-  * No FAISS index? retrieval raises a clear 503 telling you to run Phase 0.
-  * Persistence failure? logged, answer still returned.
-"""
 from __future__ import annotations
 
 import os
@@ -56,11 +46,6 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Never let an unhandled error leak as plain-text "Internal Server Error".
-
-    The frontend always parses responses as JSON, so a bare-text 500 surfaces to
-    users as a cryptic "Unexpected token … is not valid JSON". Returning a proper
-    JSON envelope keeps the client's error handling working everywhere."""
     log.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
@@ -70,12 +55,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 @app.on_event("startup")
 def _warmup_models() -> None:
-    """Preload the FAISS index and embedding model in the background.
-
-    The first query otherwise pays a ~60s cold-start to load InLegalBERT, which
-    can outlast the dev proxy's timeout and bubble up as a 500. Warming in a
-    daemon thread keeps startup instant while making the first real request fast.
-    """
 
     def _load() -> None:
         try:
@@ -84,6 +63,15 @@ def _warmup_models() -> None:
 
             _load_model()
             log.info("Warmup complete: FAISS index + embedding model ready.")
+            try:
+                import lexical
+                import rerank
+
+                lexical._build()
+                rerank._load()
+                log.info("Warmup complete: BM25 index + cross-encoder reranker ready.")
+            except Exception as e:  # noqa: BLE001 - hybrid/rerank are best-effort
+                log.warning("Hybrid/rerank warmup failed (non-fatal): %s", e)
         except FileNotFoundError as e:
             log.warning("Warmup skipped (index not built): %s", e)
         except Exception as e:  # noqa: BLE001 - warmup is best-effort
@@ -97,12 +85,6 @@ import functools
 
 @functools.lru_cache(maxsize=1)
 def _jwks_client():
-    """Cached client for Supabase's public signing keys (JWKS).
-
-    Modern Supabase projects sign session tokens with asymmetric keys (ES256/
-    RS256) and publish the public half here. PyJWKClient fetches + caches them
-    and picks the right key by the token's `kid`.
-    """
     import jwt
 
     url = get_settings().supabase_url.rstrip("/") + "/auth/v1/.well-known/jwks.json"
@@ -110,18 +92,6 @@ def _jwks_client():
 
 
 def get_user_id(authorization: str | None = Header(default=None)) -> str:
-    """Resolve the caller's user id from their Supabase session JWT.
-
-    Reads the `Authorization: Bearer <token>` header and returns the verified
-    `sub` (the user's uuid), so it can be trusted to scope each user's own
-    history. Supports both token styles Supabase issues:
-      * ES256/RS256 (current default) — verified against the project's public
-        JWKS keys;
-      * HS256 (legacy) — verified with SUPABASE_JWT_SECRET.
-    When no token is sent we fall back to a sentinel "dev-user" so the app still
-    runs without auth wired up. A bad/unverifiable token also falls back rather
-    than 500-ing the request.
-    """
     if not authorization:
         return "dev-user"
     token = authorization.removeprefix("Bearer ").strip()
@@ -195,11 +165,6 @@ class CaseBody(BaseModel):
 
 
 class VoiceCallBody(BaseModel):
-    """A finished voice call, handed over by the frontend for persistence.
-
-    The call itself runs in the separate `voice/` service, which has no Supabase
-    credentials and no notion of the caller's identity — the browser holds both,
-    so it relays the finished call here to be filed under the user's session."""
 
     question: str
     summary: str
@@ -221,9 +186,6 @@ async def doc_analyze_route(
     session_id: str | None = Form(None),
     user_id: str = Depends(get_user_id),
 ) -> dict:
-    """Extract text from an uploaded legal document, analyze it, and cache it for
-    follow-up chat. Grounded only in the document itself (not the case-law corpus).
-    """
     s = get_settings()
     data = await file.read()
     if not data:
@@ -270,7 +232,6 @@ async def doc_analyze_route(
 
 @app.post("/api/doc/chat")
 def doc_chat_route(body: DocChatBody, user_id: str = Depends(get_user_id)) -> dict:
-    """Answer a follow-up question grounded in a previously analyzed document."""
     doc = doc_store_mod.get(body.doc_id)
     if not doc:
         raise HTTPException(
@@ -293,8 +254,6 @@ def doc_chat_route(body: DocChatBody, user_id: str = Depends(get_user_id)) -> di
 
 @app.post("/api/doc/term")
 def doc_term_route(body: DocTermBody) -> dict:
-    """Explain a single legal term in plain language, using the analyzed document for
-    context on how it is used. General definitional info, not legal advice."""
     doc = doc_store_mod.get(body.doc_id)
     if not doc:
         raise HTTPException(
@@ -307,8 +266,6 @@ def doc_term_route(body: DocTermBody) -> dict:
 
 @app.post("/api/case")
 def case_route(body: CaseBody) -> dict:
-    """Return a full judgment reconstructed from its chunks, with the cited chunk
-    flagged so the UI can show the whole case with the relied-on passage highlighted."""
     try:
         case = case_view_mod.get_case(
             citation=body.citation, case_name=body.case_name, highlight_id=body.highlight_id
@@ -322,8 +279,6 @@ def case_route(body: CaseBody) -> dict:
 
 @app.post("/api/chat")
 def legal_chat_route(body: ChatBody, user_id: str = Depends(get_user_id)) -> dict:
-    """Answer a free-form legal question conversationally, grounded in cases
-    retrieved from the corpus. Stateless: the client sends the history each turn."""
     try:
         history = [{"role": t.role, "content": t.content} for t in body.history]
         result = legal_qa_mod.answer(body.question, history)
@@ -343,7 +298,6 @@ def legal_chat_route(body: ChatBody, user_id: str = Depends(get_user_id)) -> dic
 
 @app.post("/api/statutes")
 def statutes_route(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
-    """Identify governing Acts/sections for a situation, linked to retrieved cases."""
     try:
         result = statute_finder_mod.find(body.question)
     except FileNotFoundError as e:
@@ -362,13 +316,6 @@ def statutes_route(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict
 
 @app.post("/api/voice/record")
 def voice_record_route(body: VoiceCallBody, user_id: str = Depends(get_user_id)) -> dict:
-    """File a finished voice call into the thread of the tab it was started from.
-
-    A call and a typed question are the same conversation about the same matter,
-    so the summary belongs inline in that tab's history rather than in a separate
-    silo — and filing it under the originating tool is what makes it rehydrate
-    where the user saw it. No model runs here; the voice service already wrote
-    the summary."""
     tool = body.tool if body.tool in ("assistant", "predict", "statutes") else "assistant"
     payload = {"source": "voice", "voice_citations": body.citations}
     conversation_id = db.record_turn(
@@ -385,7 +332,6 @@ def voice_record_route(body: VoiceCallBody, user_id: str = Depends(get_user_id))
 
 @app.post("/api/retrieve")
 def retrieve_only(body: QueryBody) -> dict:
-    """Phase 1 debug endpoint: reformulate + retrieve, NO prediction."""
     reformulated = reformulate_mod.reformulate(body.question)
     try:
         result = retrieval_mod.retrieve(reformulated, body.question)
@@ -426,7 +372,8 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
                 system=load_prompt("general_legal_v2.txt"),
                 user=question,
                 temperature=0.3,
-                max_tokens=400,
+                max_tokens=1000,
+                reasoning_effort="low",
             ).strip()
         except Exception as e:  # noqa: BLE001
             log.error("general_legal answer failed: %s", e)
@@ -463,17 +410,21 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    prediction = predict_mod.predict(reformulated, question, result)
+    precedent = ensemble_mod.precedent_vote(result)
+    clf = classifier_mod.predict_win(reformulated)
+
+    prediction, validation = predict_mod.predict_validated(
+        reformulated, question, result, precedent=precedent, classifier=clf
+    )
     prediction["_model_version"] = predict_mod.MODEL_VERSION
 
     prediction = verify_mod.verify(prediction, result)
 
-    precedent = ensemble_mod.precedent_vote(result)
-    clf = classifier_mod.predict_win(reformulated)
     combined = ensemble_mod.combine(
         precedent=precedent,
         llm_outcome=prediction["likely_outcome"],
         classifier=clf,
+        llm_confidence=prediction.get("confidence"),
     )
     prediction_signals = {
         "precedent_vote": precedent,
@@ -503,6 +454,7 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
         "what_would_strengthen": prediction.get("what_would_strengthen", []),
         "cited_cases": prediction["cited_cases"],
         "verification": prediction["verification"],
+        "validation": validation,
         "disclaimer": s.disclaimer,
         "case_id": case_id,
     }
@@ -527,13 +479,11 @@ def history(user_id: str = Depends(get_user_id)) -> dict:
 
 @app.get("/api/conversations")
 def conversations(user_id: str = Depends(get_user_id)) -> dict:
-    """Sidebar list of the caller's past threads, most-recently-active first."""
     return {"conversations": db.list_conversations(user_id)}
 
 
 @app.get("/api/conversations/{conversation_id}")
 def conversation_detail(conversation_id: str, user_id: str = Depends(get_user_id)) -> dict:
-    """Full thread (header + ordered messages) to rehydrate a past session."""
     thread = db.get_conversation(user_id=user_id, conversation_id=conversation_id)
     if thread is None:
         raise HTTPException(status_code=404, detail="Conversation not found.")
@@ -542,13 +492,11 @@ def conversation_detail(conversation_id: str, user_id: str = Depends(get_user_id
 
 @app.get("/api/sessions")
 def sessions(user_id: str = Depends(get_user_id)) -> dict:
-    """Sidebar list of the caller's workspace sessions, most-recently-active first."""
     return {"sessions": db.list_sessions(user_id)}
 
 
 @app.get("/api/sessions/{session_id}")
 def session_detail(session_id: str, user_id: str = Depends(get_user_id)) -> dict:
-    """All per-tool threads of one session, each with messages, to rehydrate tabs."""
     sess = db.get_session(user_id=user_id, session_id=session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="Session not found.")

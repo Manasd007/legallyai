@@ -1,8 +1,3 @@
-"""Intake router: classify legal / general_legal / not_legal (brief §6.1).
-
-Single fast Groq call returning JSON. Wired into /api/query's request flow
-in main.py; /api/retrieve bypasses it for direct reformulate+retrieve debugging.
-"""
 from __future__ import annotations
 
 import json
@@ -11,6 +6,7 @@ from typing import Literal, TypedDict
 
 from config import get_settings, load_prompt
 from llm import complete
+from textutil import is_smalltalk
 
 log = logging.getLogger("legally.router")
 
@@ -32,13 +28,12 @@ def _safe_parse(text: str) -> RouteResult:
         return {"category": cat, "topic": data.get("topic")}
     except Exception as e:  # noqa: BLE001
         log.warning("Router parse failed (%s); defaulting to 'legal'", e)
-        # Fail OPEN to the legal path: better to attempt grounded retrieval than
-        # to wrongly decline a real legal question. Retrieval + verification will
-        # still hedge if nothing relevant is found.
         return {"category": "legal", "topic": None}
 
 
 def classify(question: str) -> RouteResult:
+    if is_smalltalk(question):
+        return {"category": "not_legal", "topic": None}
     prompt = load_prompt("router_v2.txt")
     try:
         out = complete(
@@ -47,7 +42,8 @@ def classify(question: str) -> RouteResult:
             user=question,
             temperature=0.0,
             json_mode=True,
-            max_tokens=120,
+            max_tokens=512,
+            reasoning_effort="low",
         )
         return _safe_parse(out)
     except Exception as e:  # noqa: BLE001

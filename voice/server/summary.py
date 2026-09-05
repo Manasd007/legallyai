@@ -1,10 +1,3 @@
-"""Post-call text summary with full citations (context doc §2 side channels,
-§4.4c: spoken citations stay natural, full citations arrive in writing).
-
-Runs OFF the latency path — generated when the call ends (or on demand from the
-UI), so it can afford a normal LLM call and full detail. Uses the same Groq key
-as the pipeline via the OpenAI-compatible API, keeping the dependency set flat.
-"""
 from __future__ import annotations
 
 import logging
@@ -21,12 +14,6 @@ GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 async def build_summary(transcript: list[dict], state: DialogState) -> dict:
-    """Return {"summary": str, "citations": [str]} for the finished call.
-
-    `transcript` is [{"role": "user"|"assistant", "content": str}, ...].
-    Citations come from the retrieval records in DialogState — the ground truth
-    of what was actually retrieved — not from what the LLM said aloud.
-    """
     citations: list[str] = []
     for rec in state.retrievals:
         for c in rec.top_citations:

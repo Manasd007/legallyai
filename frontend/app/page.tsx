@@ -34,21 +34,21 @@ const CAPABILITIES: {
     title: "Assess a case",
     body:
       "Describe your situation or attach a document. See where you stand and what helps or hurts, weighed against how real Supreme Court cases were decided.",
-    href: "/workspace?tab=assess",
+    href: "/workspace/assess",
   },
   {
     icon: ChatIcon,
     title: "Ask a question",
     body:
       "Ask any legal question and get a clear answer that cites the actual judgments behind it, so you can check the source yourself.",
-    href: "/workspace?tab=ask",
+    href: "/workspace/ask",
   },
   {
     icon: BookIcon,
     title: "Find the law",
     body:
       "Pinpoint the Acts and sections that govern your situation, linked to the cases that interpret them.",
-    href: "/workspace?tab=law",
+    href: "/workspace/law",
   },
 ];
 
@@ -92,7 +92,7 @@ export default function Home() {
           </Reveal>
 
           <Reveal delay={0.75} className="flex flex-wrap items-center justify-center gap-3">
-            <Link href="/workspace?tab=assess" className="btn-primary">
+            <Link href="/workspace/assess" className="btn-primary">
               Assess your case
               <ArrowIcon />
             </Link>
@@ -138,7 +138,7 @@ export default function Home() {
 
       <DashboardDemo />
 
-      <section id="how" className="border-y border-ink/10 bg-navy-950 text-cream">
+      <section id="how" className="border-y-2 border-ink bg-navy-950 text-cream">
         <div className="container-page py-20">
           <Reveal className="max-w-2xl">
             <span className="eyebrow text-gold-400"><GoldLine className="h-px w-6 bg-gold-400" />How it works</span>
@@ -146,7 +146,7 @@ export default function Home() {
               From your situation to an answer you can check.
             </h2>
           </Reveal>
-          <Stagger className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-white/10 sm:grid-cols-2 lg:grid-cols-4" gap={0.08}>
+          <Stagger className="mt-12 grid gap-px overflow-hidden rounded border-2 border-white/20 bg-white/20 sm:grid-cols-2 lg:grid-cols-4" gap={0.08}>
             {STEPS.map((s) => (
               <StaggerItem key={s.n} className="bg-surface/[0.03] p-7">
                 <div className="font-serif text-2xl text-gold-400">{s.n}</div>
@@ -158,9 +158,9 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-y border-ink/10 bg-surface/40 py-5">
+      <section className="border-y-2 border-ink bg-surface/40 py-5 backdrop-blur-sm">
         <div className="container-page mb-3">
-          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-ink/40">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-ink/45">
             Matters people bring to Legally AI
           </span>
         </div>
@@ -198,7 +198,7 @@ export default function Home() {
           </Reveal>
 
           <Reveal delay={0.1} className="card">
-            <div className="text-sm font-semibold uppercase tracking-wider text-ink/55">
+            <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/55">
               Agreement → confidence
             </div>
             <div className="mt-5 space-y-3">
@@ -207,7 +207,7 @@ export default function Home() {
                 ["Two of three agree", "medium", 66],
                 ["Signals diverge", "low", 33],
               ].map(([label, conf, w]) => (
-                <div key={conf as string} className="rounded-xl border border-ink/10 bg-surface/60 p-4">
+                <div key={conf as string} className="rounded border-2 border-ink/20 bg-surface/60 p-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-ink/75">{label}</span>
                     <span className="font-semibold capitalize text-ink">{conf}</span>
@@ -223,14 +223,14 @@ export default function Home() {
       </section>
 
       <section className="container-page pb-8">
-        <Reveal className="overflow-hidden rounded-3xl bg-navy-950 px-8 py-12 text-center text-cream shadow-lift sm:px-16">
+        <Reveal className="overflow-hidden rounded border-2 border-ink bg-navy-950 px-8 py-12 text-center text-cream shadow-brutal-lg sm:px-16">
           <h2 className="mx-auto max-w-2xl font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
             See where your case stands.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-cream/70">
             Describe what happened in a few sentences, or attach a document. It takes a minute.
           </p>
-          <Link href="/workspace?tab=assess" className="btn-primary mt-8 bg-gold-500 text-navy-950 hover:bg-gold-400">
+          <Link href="/workspace/assess" className="btn-primary mt-8 bg-gold-500 text-navy-950 hover:bg-gold-400">
             Assess your case
             <ArrowIcon />
           </Link>

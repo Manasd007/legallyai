@@ -20,20 +20,19 @@ type Frame = {
   render: () => JSX.Element;
 };
 
-/* ------------------------------ Faux screens ------------------------------ */
 
 function AssessScreen() {
   return (
     <div className="space-y-5">
-      <div className="border-l-2 border-gold-500/40 pl-4">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-ink/45">Your situation</p>
+      <div className="border-l-4 border-gold-500 pl-4">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Your situation</p>
         <p className="mt-1.5 text-sm leading-relaxed text-ink/75">
           “My employer terminated me without notice or inquiry after 12 years of service.”
         </p>
       </div>
       <div>
         <div className="flex items-end justify-between gap-4">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-ink/45">
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
             Success estimate
           </span>
           <span className="font-serif text-3xl font-semibold tabular-nums leading-none text-ink">
@@ -49,7 +48,7 @@ function AssessScreen() {
           />
         </div>
       </div>
-      <div className="space-y-2.5 border-t border-ink/10 pt-4">
+      <div className="space-y-2.5 border-t-2 border-ink/15 pt-4">
         <div className="flex gap-2.5 text-sm">
           <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500" />
           <span className="text-ink/65"><span className="font-medium text-ink/85">Helps you:</span> 12 years of service</span>
@@ -59,7 +58,7 @@ function AssessScreen() {
           <span className="text-ink/60"><span className="font-medium text-ink/75">Depends on:</span> how you were dismissed</span>
         </div>
       </div>
-      <div className="rounded-xl border border-ink/10 bg-surface/60 px-4 py-3 text-xs leading-relaxed text-ink/55">
+      <div className="rounded border-2 border-ink bg-surface/60 px-4 py-3 text-xs leading-relaxed text-ink/55">
         Based on <span className="font-medium text-ink/80">4 similar Supreme Court cases</span>, 3 of 4 decided in the claimant&apos;s favour.
       </div>
     </div>
@@ -69,7 +68,7 @@ function AssessScreen() {
 function AskScreen() {
   return (
     <div className="space-y-4">
-      <div className="ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-navy-900 px-4 py-2.5 text-sm text-cream">
+      <div className="ml-auto max-w-[80%] rounded border-2 border-ink bg-navy-900 px-4 py-2.5 text-sm text-cream shadow-brutal-sm">
         Is a dismissal without inquiry valid for a workman?
       </div>
       <div className="max-w-[88%] space-y-3">
@@ -82,8 +81,8 @@ function AskScreen() {
             ["Workmen of M/s Firestone v. Mgmt.", "1973 INSC 4"],
             ["Delhi Transport Corp. v. DTC Mazdoor", "1990 INSC 285"],
           ].map(([name, cite]) => (
-            <div key={cite} className="flex items-center gap-2.5 rounded-lg border border-ink/10 bg-surface/60 px-3 py-2">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-navy-900 text-gold-400">
+            <div key={cite} className="flex items-center gap-2.5 rounded border-2 border-ink/20 bg-surface/60 px-3 py-2">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded border-2 border-ink bg-navy-900 text-gold-400">
                 <BookIcon className="h-3.5 w-3.5" />
               </span>
               <span className="min-w-0">
@@ -101,13 +100,13 @@ function AskScreen() {
 function FindScreen() {
   return (
     <div className="space-y-3">
-      <div className="text-[11px] font-medium uppercase tracking-wider text-ink/45">Acts &amp; sections that govern this</div>
+      <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">Acts &amp; sections that govern this</div>
       {[
         ["Industrial Disputes Act, 1947", "S. 25F: Conditions precedent to retrenchment", "6 cases interpret this"],
         ["Industrial Disputes Act, 1947", "S. 11A: Powers of the Tribunal on dismissal", "4 cases interpret this"],
         ["Constitution of India", "Art. 14: Equality & fairness in State action", "9 cases interpret this"],
       ].map(([act, sec, cases], i) => (
-        <div key={i} className="rounded-xl border border-ink/10 bg-surface/60 p-3.5">
+        <div key={i} className="rounded border-2 border-ink/20 bg-surface/60 p-3.5">
           <div className="text-xs font-semibold text-ink">{act}</div>
           <div className="mt-1 text-sm text-ink/70">{sec}</div>
           <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-medium text-gold-700">
@@ -122,8 +121,8 @@ function FindScreen() {
 function DocScreen() {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2.5 rounded-xl border border-ink/10 bg-surface/60 px-3.5 py-2.5">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-navy-900 text-gold-400">
+      <div className="flex items-center gap-2.5 rounded border-2 border-ink/20 bg-surface/60 px-3.5 py-2.5">
+        <span className="grid h-8 w-8 place-items-center rounded border-2 border-ink bg-navy-900 text-gold-400">
           <DocIcon className="h-4 w-4" />
         </span>
         <span className="min-w-0">
@@ -132,7 +131,7 @@ function DocScreen() {
         </span>
       </div>
       <div>
-        <div className="text-[11px] font-medium uppercase tracking-wider text-ink/45">List of dates</div>
+        <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">List of dates</div>
         <div className="mt-2 space-y-2">
           {[
             ["12 Jan 2012", "Joined as permanent workman"],
@@ -145,9 +144,9 @@ function DocScreen() {
           ))}
         </div>
       </div>
-      <div className="flex flex-wrap gap-1.5 border-t border-ink/10 pt-3">
+      <div className="flex flex-wrap gap-1.5 border-t-2 border-ink/15 pt-3">
         {["Wrongful termination", "No inquiry", "Workman", "12 yrs service"].map((t) => (
-          <span key={t} className="rounded-full border border-ink/10 bg-surface/60 px-2.5 py-1 text-[11px] text-ink/60">
+          <span key={t} className="rounded border-2 border-ink/20 bg-surface/60 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.06em] text-ink/60">
             {t}
           </span>
         ))}
@@ -186,12 +185,11 @@ const FRAMES: Frame[] = [
     nav: "Read a document",
     icon: DocIcon,
     title: "Drop a document, get the gist.",
-    body: "Attach a letter, notice, or order right inside Assess a case — Legally AI pulls out the dates, parties, and issues that matter.",
+    body: "Attach a letter, notice, or order right inside Assess a case, and Legally AI pulls out the dates, parties, and issues that matter.",
     render: DocScreen,
   },
 ];
 
-/* ------------------------------ Demo section ------------------------------ */
 
 export function DashboardDemo() {
   const reduce = useReducedMotion();
@@ -212,9 +210,6 @@ export function DashboardDemo() {
 
   return (
     <div id="demo">
-      {/* Mobile & tablet: no scroll-jacking (a pinned scrub feels endless and
-          cramped below lg) — instead each tool gets its own full-width card,
-          with the real app-window mockup, that fades in as it's scrolled to. */}
       <section className="bg-navy-950 py-16 text-cream lg:hidden">
         <div className="container-page">
           <span className="eyebrow text-gold-400">
@@ -245,8 +240,8 @@ export function DashboardDemo() {
                     aria-hidden
                     className="absolute -inset-4 -z-10 rounded-3xl bg-[radial-gradient(ellipse_at_50%_0%,rgba(var(--c-gold-500),0.16),transparent_65%)]"
                   />
-                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-parchment text-ink shadow-lift">
-                    <div className="flex items-center gap-2 border-b border-ink/10 bg-surface/70 px-4 py-2.5">
+                  <div className="overflow-hidden rounded border-2 border-ink bg-parchment text-ink shadow-brutal-lg">
+                    <div className="flex items-center gap-2 border-b-2 border-ink/15 bg-surface/70 px-4 py-2.5">
                       <span className="h-2.5 w-2.5 rounded-full bg-ink/15" />
                       <span className="h-2.5 w-2.5 rounded-full bg-ink/15" />
                       <span className="h-2.5 w-2.5 rounded-full bg-ink/15" />
@@ -268,7 +263,6 @@ export function DashboardDemo() {
         </div>
       </section>
 
-      {/* Desktop: scroll-pinned walkthrough, narrative column + live mockup */}
       <section
         ref={ref}
         className="relative hidden bg-navy-950 text-cream lg:block"
@@ -276,7 +270,6 @@ export function DashboardDemo() {
       >
         <div className={reduce ? "py-20" : "sticky top-0 flex min-h-screen items-center py-20"}>
         <div className="container-page grid w-full items-center gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-          {/* Narrative column */}
           <div>
             <span className="eyebrow text-gold-400">
               <GoldLine className="h-px w-6 bg-gold-400" />A quick tour
@@ -296,12 +289,12 @@ export function DashboardDemo() {
                 return (
                   <div
                     key={f.id}
-                    className={`flex gap-3.5 rounded-xl border px-4 py-3.5 transition-colors duration-300 ${
-                      on ? "border-gold-500/40 bg-white/[0.06]" : "border-transparent"
+                    className={`flex gap-3.5 rounded border-2 px-4 py-3.5 transition-colors duration-300 ${
+                      on ? "border-gold-500/60 bg-white/[0.06]" : "border-transparent"
                     }`}
                   >
                     <span
-                      className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors duration-300 ${
+                      className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-ink/40 transition-colors duration-300 ${
                         on ? "bg-gold-500 text-navy-950" : "bg-white/10 text-cream/60"
                       }`}
                     >
@@ -332,15 +325,13 @@ export function DashboardDemo() {
             </div>
           </div>
 
-          {/* App-window mockup */}
           <div className="relative">
             <div
               aria-hidden
               className="absolute -inset-6 -z-10 rounded-3xl bg-[radial-gradient(ellipse_at_50%_0%,rgba(var(--c-gold-500),0.18),transparent_65%)]"
             />
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-parchment text-ink shadow-lift">
-              {/* Window chrome */}
-              <div className="flex items-center gap-2 border-b border-ink/10 bg-surface/70 px-4 py-2.5">
+            <div className="overflow-hidden rounded border-2 border-ink bg-parchment text-ink shadow-brutal-lg">
+              <div className="flex items-center gap-2 border-b-2 border-ink/15 bg-surface/70 px-4 py-2.5">
                 <span className="h-2.5 w-2.5 rounded-full bg-ink/15" />
                 <span className="h-2.5 w-2.5 rounded-full bg-ink/15" />
                 <span className="h-2.5 w-2.5 rounded-full bg-ink/15" />
@@ -350,17 +341,15 @@ export function DashboardDemo() {
               </div>
 
               <div className="grid sm:grid-cols-[150px_1fr]">
-                {/* Faux sidebar — only the 3 real workspace tabs; the doc
-                    frame lives inside "Assess a case", so it highlights that. */}
-                <div className="hidden flex-col gap-1 border-r border-ink/10 bg-surface/40 p-3 sm:flex">
+                <div className="hidden flex-col gap-1 border-r-2 border-ink/15 bg-surface/40 p-3 sm:flex">
                   {FRAMES.slice(0, 3).map((f, i) => {
                     const Icon = f.icon;
                     const on = i === (active === 3 ? 0 : active);
                     return (
                       <div
                         key={f.id}
-                        className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-medium transition-colors duration-300 ${
-                          on ? "bg-navy-900 text-cream" : "text-ink/55"
+                        className={`flex items-center gap-2 rounded border-2 px-2.5 py-2 font-mono text-[10px] font-semibold uppercase tracking-[0.06em] transition-colors duration-300 ${
+                          on ? "border-ink bg-navy-900 text-cream" : "border-transparent text-ink/55"
                         }`}
                       >
                         <Icon className={`h-4 w-4 shrink-0 ${on ? "text-gold-400" : "text-ink/45"}`} />
@@ -370,7 +359,6 @@ export function DashboardDemo() {
                   })}
                 </div>
 
-                {/* Active screen */}
                 <div className="min-h-[340px] p-5 sm:p-6">
                   <AnimatePresence mode="wait">
                     <motion.div

@@ -8,9 +8,6 @@ import { BrandLoader } from "@/components/BrandLoader";
 import { getJson } from "@/components/api";
 import { useAuth } from "@/components/auth";
 
-/* Read-only viewer for a past conversation ("chat section"). Rehydrates the
-   stored messages so a returning user can revisit everything they generated.
-   Rich prediction details live in each assistant message's `payload`. */
 
 type Message = {
   id: string;
@@ -93,7 +90,7 @@ function ThreadMessage({ msg }: { msg: Message }) {
   if (msg.role === "user") {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl bg-navy-900 px-4 py-2.5 text-sm leading-relaxed text-cream">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded border-2 border-ink bg-navy-900 px-4 py-2.5 text-sm leading-relaxed text-cream shadow-brutal-sm">
           {msg.content}
         </div>
       </div>
@@ -102,7 +99,7 @@ function ThreadMessage({ msg }: { msg: Message }) {
   return (
     <div className="flex justify-start">
       <div className="max-w-[92%] space-y-3">
-        <div className="whitespace-pre-wrap rounded-2xl border border-ink/10 bg-surface/70 px-4 py-3 text-sm leading-relaxed text-ink/85">
+        <div className="whitespace-pre-wrap rounded border-2 border-ink bg-surface/65 px-4 py-3 text-sm leading-relaxed text-ink/85 backdrop-blur-md">
           {msg.content || "No content"}
         </div>
         {msg.payload && <PredictionSummary payload={msg.payload} />}
@@ -111,8 +108,6 @@ function ThreadMessage({ msg }: { msg: Message }) {
   );
 }
 
-/* A compact, defensive render of whatever structured data we stored. We don't
-   assume a particular tool's shape — we show the fields that are present. */
 function PredictionSummary({ payload }: { payload: any }) {
   const outcome = payload.likely_outcome;
   const winProb = payload.win_probability;
@@ -124,7 +119,7 @@ function PredictionSummary({ payload }: { payload: any }) {
   if (!hasStats && !cited?.length && !statutes?.length) return null;
 
   return (
-    <div className="rounded-2xl border border-ink/10 bg-surface/50 px-4 py-3 text-sm">
+    <div className="rounded border-2 border-ink bg-surface/45 px-4 py-3 text-sm backdrop-blur-md">
       {hasStats && (
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-ink/75">
           {outcome && (
@@ -140,7 +135,7 @@ function PredictionSummary({ payload }: { payload: any }) {
       )}
       {statutes?.length ? (
         <div className="mt-2 text-xs text-ink/60">
-          <span className="font-semibold uppercase tracking-wider text-ink/40">Statutes</span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/40">Statutes</span>
           <ul className="mt-1 space-y-0.5">
             {statutes.map((s, i) => (
               <li key={i}>{[s.act, s.section].filter(Boolean).join(" · ")}</li>
@@ -150,7 +145,7 @@ function PredictionSummary({ payload }: { payload: any }) {
       ) : null}
       {cited?.length ? (
         <div className="mt-2 text-xs text-ink/60">
-          <span className="font-semibold uppercase tracking-wider text-ink/40">Cases relied on</span>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/40">Cases relied on</span>
           <ul className="mt-1 space-y-0.5">
             {cited.map((c, i) => (
               <li key={i}>{c.case_name}{c.citation ? ` · ${c.citation}` : ""}</li>

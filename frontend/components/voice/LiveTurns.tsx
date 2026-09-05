@@ -24,10 +24,10 @@ export function LiveTurns({ turns }: { turns: Turn[] }) {
             className={`flex ${you ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+              className={`max-w-[85%] rounded border-2 px-4 py-2.5 text-sm leading-relaxed ${
                 you
-                  ? "bg-navy-900 text-cream"
-                  : "border border-ink/10 bg-surface/70 text-ink/85"
+                  ? "border-ink bg-navy-900 text-cream shadow-brutal-sm"
+                  : "border-ink bg-surface/65 text-ink/85 backdrop-blur-md"
               }`}
             >
               {t.final}

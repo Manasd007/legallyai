@@ -24,11 +24,11 @@ html.lenis body {
    dark = warm near-black editorial. Brand/on-brand flip per theme so the
    primary button is dark-on-cream in light and near-white-on-black in dark. */
 :root {
-  /* Type — Satoshi for headings (consumed by the `font-serif` utility, kept
-     for compatibility with existing call sites) and Cabinet Grotesk for
-     body/subtext (`font-sans`). Both load from Fontshare in layout.tsx. */
-  --font-serif: "Satoshi";
-  --font-sans: "Cabinet Grotesk";
+  /* Type — Clash Display for headings (consumed by the `font-serif` utility,
+     name kept for compatibility) and General Sans for body/subtext
+     (`font-sans`). Both load from Fontshare in layout.tsx. */
+  --font-serif: "Clash Display";
+  --font-sans: "General Sans";
 
   color-scheme: light;
   --c-parchment: 244 241 234; /* page bg  #f4f1ea */
@@ -73,8 +73,35 @@ body {
 /* Dark mode: drop the amber wash for a neutral, faint white depth cue. */
 .dark body {
   background-image:
-    radial-gradient(1200px 600px at 100% -10%, rgba(255, 255, 255, 0.04), transparent 60%),
+    radial-gradient(1200px 600px at 100% -10%, rgba(255, 255, 255, 0.05), transparent 60%),
     radial-gradient(900px 500px at -10% 0%, rgba(255, 255, 255, 0.02), transparent 55%);
+}
+
+/* Brutalist texture: a faint blueprint grid layered under the page. Fixed so
+   it reads as a backdrop the glass panels float over. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgb(var(--c-ink) / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--c-ink) / 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(120% 120% at 50% 0%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(120% 120% at 50% 0%, #000 30%, transparent 78%);
+}
+
+/* Loud, deliberate selection — brutalist accent, not the browser default. */
+::selection {
+  background: rgb(var(--c-gold-500));
+  color: rgb(var(--c-parchment));
+}
+
+/* Headings get tighter tracking to sit like set type, not AI output. */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
 }
 
 /* Indeterminate sliding segment for the route-transition top bar. */
@@ -105,30 +132,46 @@ body {
     @apply mx-auto w-full max-w-content px-6 lg:px-8;
   }
 
+  /* Reusable frosted-glass panel: translucent surface, real blur, hard ink
+     frame. The building block of the whole brutalist-glass system. */
+  .glass {
+    @apply border-2 border-ink bg-surface/60 backdrop-blur-md;
+  }
+
+  /* Primary CTA: hard ink border + offset shadow that lifts on hover and
+     presses flush on click (the neo-brutalist button motion). */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-3
-      text-sm font-semibold text-onbrand shadow-card ring-1 ring-inset ring-white/10 transition
-      hover:opacity-90 hover:shadow-lift focus:outline-none focus-visible:ring-2
-      focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-parchment
-      disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded border-2 border-ink bg-brand
+      px-5 py-3 text-sm font-bold tracking-tight text-onbrand shadow-brutal-sm
+      transition-[transform,box-shadow] duration-150
+      hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-brutal
+      active:translate-x-0 active:translate-y-0 active:shadow-none
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2
+      focus-visible:ring-offset-parchment disabled:cursor-not-allowed
+      disabled:opacity-50 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-brutal-sm;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-ink/15
-      bg-surface/60 px-5 py-3 text-sm font-semibold text-ink transition
-      hover:border-ink/30 hover:bg-surface focus:outline-none focus-visible:ring-2
-      focus-visible:ring-gold-400 focus-visible:ring-offset-2 focus-visible:ring-offset-parchment;
+    @apply inline-flex items-center justify-center gap-2 rounded border-2 border-ink
+      bg-surface/50 px-5 py-3 text-sm font-bold tracking-tight text-ink backdrop-blur-md
+      shadow-brutal-sm transition-[transform,box-shadow] duration-150
+      hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-brutal
+      active:translate-x-0 active:translate-y-0 active:shadow-none
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2
+      focus-visible:ring-offset-parchment;
   }
 
+  /* Eyebrow: mono, uppercase, with a solid gold tick before it. */
   .eyebrow {
-    @apply inline-flex items-center gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.2em] text-gold-600;
+    @apply inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-600;
   }
 
+  /* Card: frosted glass framed by a hard ink border with an offset shadow. */
   .card {
-    @apply rounded-2xl border border-ink/10 bg-surface/80 p-6 shadow-card backdrop-blur-sm;
+    @apply rounded-lg border-2 border-ink bg-surface/65 p-6 shadow-card backdrop-blur-md;
   }
 
   .hairline {
-    @apply border-ink/10;
+    @apply border-ink/15;
   }
 }

@@ -1,19 +1,3 @@
-"""Legally AI Voice server: FastAPI + WebRTC entrypoint.
-
-Endpoints:
-    POST /api/offer?session_id=  → WebRTC signaling; starts one pipeline per call
-    WS   /ws/events/{session_id} → live transcript / latency / status events
-    GET  /api/metrics            → P50/P95 per stage (this process)
-    POST /api/summary/{session_id} → post-call text summary with full citations
-    GET  /api/health
-
-This is a headless service. The UI lives in the Legally AI Next.js frontend
-(`frontend/components/VoiceCall.tsx`), which talks to this origin directly —
-WebRTC signaling and the events WebSocket both need a real origin, and Vercel
-rewrites do not proxy WebSockets. Hence CORS below rather than a proxy.
-
-Run:  uvicorn server.main:app --host 0.0.0.0 --port 7860
-"""
 from __future__ import annotations
 
 import asyncio
@@ -37,8 +21,6 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("legallyai.voice.main")
 
 turn_log = TurnLog()
-# session_id → SessionHub; kept after the call ends so the summary endpoint can
-# still see the transcript. Bounded pruning keeps a long-lived process healthy.
 sessions: dict[str, SessionHub] = {}
 MAX_KEPT_SESSIONS = 50
 
@@ -59,10 +41,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Legally AI Voice", version="0.1.0", lifespan=lifespan)
 
-# The frontend is served from a different origin (Next.js dev on :3000, Vercel in
-# prod), so every call here is cross-origin. Only the frontend origins are
-# allowed — this service holds no cookies, but the offer/summary routes start
-# real work and shouldn't be reachable from arbitrary pages.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
@@ -83,18 +61,15 @@ def health() -> dict:
 
 @app.post("/api/offer")
 async def offer(body: dict, session_id: str) -> dict:
-    """WebRTC signaling: accept the browser's SDP offer, spin up a pipeline for
-    this call, return the answer."""
     sdp, sdp_type = body.get("sdp"), body.get("type")
     if not sdp or not sdp_type:
         raise HTTPException(status_code=400, detail="sdp and type are required")
 
     if len(sessions) >= MAX_KEPT_SESSIONS:
-        # Drop the oldest finished sessions (insertion order = age).
         for old_id in list(sessions)[: len(sessions) - MAX_KEPT_SESSIONS + 1]:
             sessions.pop(old_id, None)
 
-    connection = SmallWebRTCConnection()
+    connection = SmallWebRTCConnection(ice_servers=get_settings().ice_servers)
     await connection.initialize(sdp=sdp, type=sdp_type)
 
     hub = SessionHub(session_id=session_id, turn_log=turn_log)
@@ -102,8 +77,6 @@ async def offer(body: dict, session_id: str) -> dict:
     worker = build_pipeline_worker(connection, hub)
 
     async def _run() -> None:
-        # Signals belong to uvicorn; the worker cancels itself on client
-        # disconnect (wired in the builder), which ends this runner.
         runner = WorkerRunner(handle_sigint=False)
         try:
             await runner.add_workers(worker)

@@ -1,17 +1,3 @@
-"""Per-turn latency telemetry (context doc §3: "instrument first, optimize
-second").
-
-Every conversational turn produces one TurnRecord with per-stage timings:
-
-    endpoint_ms   user stopped speaking → final transcript ready
-    llm_first_ms  transcript ready → first LLM token
-    tool_ms       legal_search round-trip (0 when no tool call)
-    tts_first_ms  first sentence ready → first audio byte
-    e2e_ms        user stopped speaking → agent audio starts (the number users feel)
-
-Records are appended to a JSONL file per session and aggregated on demand into
-P50/P95 per stage for the dashboard and the latency regression eval (§6.6).
-"""
 from __future__ import annotations
 
 import json
@@ -36,11 +22,10 @@ class TurnRecord:
     user_text: str = ""
     agent_text: str = ""
     interrupted: bool = False
-    delivered_chars: int = 0  # how much of agent_text was actually heard (§4.2)
+    delivered_chars: int = 0
     tool_called: bool = False
     tool_query: str = ""
     weak_retrieval: bool = False
-    # Stage timings (ms). -1 = not measured this turn.
     endpoint_ms: int = -1
     stt_final_ms: int = -1
     llm_first_ms: int = -1
@@ -53,7 +38,6 @@ class TurnRecord:
 
 
 class TurnLog:
-    """Append-only JSONL sink + in-memory aggregation for one server process."""
 
     def __init__(self, telemetry_dir: str | None = None) -> None:
         self._dir = Path(telemetry_dir or get_settings().telemetry_dir)
@@ -66,7 +50,7 @@ class TurnLog:
         try:
             with path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
-        except OSError as e:  # telemetry must never break the call
+        except OSError as e:
             log.warning("Could not persist turn record: %s", e)
         log.info(
             "turn %d [%s]: e2e=%dms endpoint=%dms llm_first=%dms tool=%dms tts_first=%dms%s",
@@ -76,7 +60,6 @@ class TurnLog:
         )
 
     def summary(self) -> dict:
-        """P50/P95 per stage over this process's turns (dashboard endpoint)."""
         out: dict = {"turns": len(self._records), "stages": {}}
         for stage in STAGES:
             values = [getattr(r, stage) for r in self._records if getattr(r, stage) >= 0]
@@ -89,7 +72,6 @@ class TurnLog:
             }
         s = get_settings()
         e2e = out["stages"].get("e2e_ms")
-        # None (unknown) until there is data — a budget can't pass vacuously.
         out["within_budget"] = (
             e2e["p50"] <= s.latency_p50_target_ms and e2e["p95"] <= s.latency_p95_target_ms
             if e2e
@@ -108,7 +90,6 @@ def _p95(values: list[int]) -> float:
 
 
 def load_records(telemetry_dir: str | None = None) -> list[dict]:
-    """Read every persisted turn record (used by the latency regression eval)."""
     d = Path(telemetry_dir or get_settings().telemetry_dir)
     records: list[dict] = []
     for path in sorted(d.glob("*.jsonl")):

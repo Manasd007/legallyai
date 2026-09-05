@@ -2,9 +2,60 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const VOICE_URL = process.env.NEXT_PUBLIC_VOICE_URL || "";
+type VoiceConfig = { voiceUrl: string; iceServers: RTCIceServer[] };
 
-export const voiceEnabled = !!VOICE_URL;
+function buildIce(
+  stun?: string,
+  turnUrl?: string,
+  turnUser?: string,
+  turnCred?: string,
+): RTCIceServer[] {
+  const servers: RTCIceServer[] = [{ urls: stun || "stun:stun.l.google.com:19302" }];
+  if (turnUrl) servers.push({ urls: turnUrl, username: turnUser, credential: turnCred });
+  return servers;
+}
+
+const BUILD_CONFIG: VoiceConfig = {
+  voiceUrl: process.env.NEXT_PUBLIC_VOICE_URL || "",
+  iceServers: buildIce(
+    process.env.NEXT_PUBLIC_STUN_URL,
+    process.env.NEXT_PUBLIC_TURN_URL,
+    process.env.NEXT_PUBLIC_TURN_USERNAME,
+    process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+  ),
+};
+
+let configPromise: Promise<VoiceConfig> | null = null;
+
+function loadVoiceConfig(): Promise<VoiceConfig> {
+  if (!configPromise) {
+    configPromise = fetch("/voice-config")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((c: Partial<Record<string, string>> | null) => {
+        if (!c || !c.voiceUrl) return BUILD_CONFIG;
+        return {
+          voiceUrl: c.voiceUrl,
+          iceServers: buildIce(c.stunUrl, c.turnUrl, c.turnUsername, c.turnCredential),
+        };
+      })
+      .catch(() => BUILD_CONFIG);
+  }
+  return configPromise;
+}
+
+export function useVoiceEnabled(): boolean {
+  const [enabled, setEnabled] = useState<boolean>(!!BUILD_CONFIG.voiceUrl);
+  useEffect(() => {
+    let alive = true;
+    loadVoiceConfig().then((c) => {
+      if (alive) setEnabled(!!c.voiceUrl);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return enabled;
+}
 
 export type CallResult = {
   summary: string;
@@ -37,6 +88,7 @@ export function useVoiceSession({ onComplete }: { onComplete: (r: CallResult) =>
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const sessionRef = useRef("");
+  const voiceUrlRef = useRef("");
   const turnsRef = useRef<Turn[]>([]);
   turnsRef.current = turns;
 
@@ -99,8 +151,8 @@ export function useVoiceSession({ onComplete }: { onComplete: (r: CallResult) =>
     }
   }
 
-  function connectEvents(sessionId: string) {
-    const ws = new WebSocket(`${VOICE_URL.replace(/^http/, "ws")}/ws/events/${sessionId}`);
+  function connectEvents(sessionId: string, voiceUrl: string) {
+    const ws = new WebSocket(`${voiceUrl.replace(/^http/, "ws")}/ws/events/${sessionId}`);
     wsRef.current = ws;
     ws.onmessage = (msg) => {
       let ev: { type?: string; turn?: number; text?: string };
@@ -146,6 +198,15 @@ export function useVoiceSession({ onComplete }: { onComplete: (r: CallResult) =>
   const start = useCallback(
     async (audioEl: HTMLAudioElement | null) => {
       audioElRef.current = audioEl;
+
+      const cfg = await loadVoiceConfig();
+      if (!cfg.voiceUrl) {
+        setPhase("idle");
+        setStatus("Voice service isn't configured");
+        return;
+      }
+      voiceUrlRef.current = cfg.voiceUrl;
+
       const sessionId = crypto.randomUUID();
       sessionRef.current = sessionId;
       setTurns([]);
@@ -162,9 +223,9 @@ export function useVoiceSession({ onComplete }: { onComplete: (r: CallResult) =>
         return;
       }
       startLevelMeter(micRef.current);
-      connectEvents(sessionId);
+      connectEvents(sessionId, cfg.voiceUrl);
 
-      const pc = new RTCPeerConnection();
+      const pc = new RTCPeerConnection({ iceServers: cfg.iceServers });
       pcRef.current = pc;
       micRef.current.getAudioTracks().forEach((t) => pc.addTrack(t, micRef.current!));
       pc.addTransceiver("audio", { direction: "recvonly" });
@@ -182,7 +243,7 @@ export function useVoiceSession({ onComplete }: { onComplete: (r: CallResult) =>
       await waitForIce(pc);
 
       try {
-        const resp = await fetch(`${VOICE_URL}/api/offer?session_id=${sessionId}`, {
+        const resp = await fetch(`${cfg.voiceUrl}/api/offer?session_id=${sessionId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sdp: pc.localDescription!.sdp, type: pc.localDescription!.type }),
@@ -210,7 +271,9 @@ export function useVoiceSession({ onComplete }: { onComplete: (r: CallResult) =>
 
     let result: CallResult | null = null;
     try {
-      const resp = await fetch(`${VOICE_URL}/api/summary/${sessionRef.current}`, { method: "POST" });
+      const resp = await fetch(`${voiceUrlRef.current}/api/summary/${sessionRef.current}`, {
+        method: "POST",
+      });
       if (resp.ok) {
         const data = await resp.json();
         if (data.summary) {

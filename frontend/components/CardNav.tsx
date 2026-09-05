@@ -1,9 +1,5 @@
 "use client";
 
-// Adapted from react-bits "CardNav" (TS + Tailwind). Two changes from the
-// upstream source so it fits this project: the arrow icon uses lucide-react
-// (already a dependency) instead of react-icons, and `logo` / links accept
-// React nodes + Next.js routes. Everything else mirrors the original.
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -36,12 +32,10 @@ export interface CardNavProps {
   buttonTextColor?: string;
   buttonLabel?: string;
   buttonHref?: string;
-  /** Dark-mode color overrides; fall back to the light values when omitted. */
   baseColorDark?: string;
   menuColorDark?: string;
   buttonBgColorDark?: string;
   buttonTextColorDark?: string;
-  /** Rendered to the left of the CTA on desktop (e.g. a theme toggle). */
   rightContent?: React.ReactNode;
 }
 
@@ -71,7 +65,6 @@ const CardNav: React.FC<CardNavProps> = ({
   const cardsRef = useRef<HTMLDivElement[]>([]);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
 
-  // Track the app's `dark` class on <html> so the bar can flip with the theme.
   useEffect(() => {
     const root = document.documentElement;
     const update = () => setIsDark(root.classList.contains("dark"));
@@ -81,9 +74,6 @@ const CardNav: React.FC<CardNavProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  // Hide-on-scroll-down / reveal-on-scroll-up: the bar slides out of the way as
-  // the user scrolls down and slides back the moment they scroll up. Always shown
-  // near the top of the page or while the menu is open.
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
@@ -103,8 +93,6 @@ const CardNav: React.FC<CardNavProps> = ({
   }, [isExpanded]);
 
   const resolvedBase = isDark ? baseColorDark ?? baseColor : baseColor;
-  // Translucent variant of the base colour for the glass finish (8-digit hex
-  // alpha); falls back to the solid colour if it isn't a hex string.
   const glassBase = /^#[0-9a-fA-F]{6}$/.test(resolvedBase ?? "")
     ? `${resolvedBase}d9`
     : resolvedBase;
@@ -232,7 +220,7 @@ const CardNav: React.FC<CardNavProps> = ({
     >
       <nav
         ref={navRef}
-        className={`card-nav ${isExpanded ? "open" : ""} block h-[60px] p-0 rounded-xl shadow-md relative overflow-hidden will-change-[height] backdrop-blur-md transition-colors duration-300`}
+        className={`card-nav ${isExpanded ? "open" : ""} block h-[60px] p-0 rounded border-2 border-ink shadow-[4px_4px_0_0_rgb(var(--c-ink))] relative overflow-hidden will-change-[height] backdrop-blur-xl transition-colors duration-300`}
         style={{ backgroundColor: glassBase }}
       >
         <div className="card-nav-top absolute inset-x-0 top-0 h-[60px] flex items-center justify-between p-2 pl-[1.1rem] z-[2]">
@@ -274,7 +262,7 @@ const CardNav: React.FC<CardNavProps> = ({
             {rightContent}
             <Link
               href={buttonHref}
-              className="card-nav-cta-button hidden md:inline-flex border-0 rounded-[calc(0.75rem-0.2rem)] px-4 items-center h-[40px] font-medium cursor-pointer transition-colors duration-300"
+              className="card-nav-cta-button hidden md:inline-flex border-2 border-ink rounded px-4 items-center h-[40px] font-bold tracking-tight cursor-pointer shadow-[2px_2px_0_0_rgb(var(--c-ink))] transition-transform duration-150 hover:-translate-x-[1px] hover:-translate-y-[1px] active:translate-x-0 active:translate-y-0"
               style={{ backgroundColor: resolvedButtonBg, color: resolvedButtonText }}
             >
               {buttonLabel}
@@ -291,21 +279,21 @@ const CardNav: React.FC<CardNavProps> = ({
           {(items || []).slice(0, 3).map((item, idx) => (
             <div
               key={`${item.label}-${idx}`}
-              className="nav-card select-none relative flex flex-col gap-2 p-[12px_16px] rounded-[calc(0.75rem-0.2rem)] min-w-0 flex-[1_1_auto] h-auto min-h-[60px] md:h-full md:min-h-0 md:flex-[1_1_0%]"
+              className="nav-card select-none relative flex flex-col gap-2 p-[12px_16px] rounded border-2 border-ink min-w-0 flex-[1_1_auto] h-auto min-h-[60px] md:h-full md:min-h-0 md:flex-[1_1_0%]"
               ref={setCardRef(idx)}
               style={{
                 backgroundColor: isDark ? item.bgColorDark ?? item.bgColor : item.bgColor,
                 color: isDark ? item.textColorDark ?? item.textColor : item.textColor,
               }}
             >
-              <div className="nav-card-label font-normal tracking-[-0.5px] text-[18px] md:text-[22px]">
+              <div className="nav-card-label font-serif font-semibold tracking-[-0.01em] text-[19px] md:text-[23px]">
                 {item.label}
               </div>
-              <div className="nav-card-links mt-auto flex flex-col gap-[2px]">
+              <div className="nav-card-links mt-auto flex flex-col gap-[3px]">
                 {item.links?.map((lnk, i) => (
                   <Link
                     key={`${lnk.label}-${i}`}
-                    className="nav-card-link inline-flex items-center gap-[6px] no-underline cursor-pointer transition-opacity duration-300 hover:opacity-75 text-[15px] md:text-[16px]"
+                    className="nav-card-link inline-flex items-center gap-[6px] no-underline cursor-pointer font-mono uppercase tracking-[0.08em] transition-opacity duration-300 hover:opacity-70 text-[12px] md:text-[13px]"
                     href={lnk.href}
                     aria-label={lnk.ariaLabel}
                   >

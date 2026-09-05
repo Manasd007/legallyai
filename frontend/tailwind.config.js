@@ -40,15 +40,37 @@ module.exports = {
         },
       },
       fontFamily: {
-        // "serif" is the heading utility (now Satoshi, a sans — utility name
-        // kept so existing `font-serif` call sites don't need to change).
+        // "serif" is the heading utility (now Clash Display, a characterful
+        // display grotesk — utility name kept so existing `font-serif` call
+        // sites don't need to change).
         serif: ["var(--font-serif)", "system-ui", "sans-serif"],
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
+      // Brutalist: flatten the radius scale so every existing `rounded-*` call
+      // site becomes crisp and boxy. `full` stays for pills, dots and avatars.
+      borderRadius: {
+        none: "0",
+        sm: "0",
+        DEFAULT: "2px",
+        md: "2px",
+        lg: "3px",
+        xl: "4px",
+        "2xl": "5px",
+        "3xl": "6px",
+        full: "9999px",
+      },
       boxShadow: {
-        card: "0 1px 2px rgba(11,22,38,0.04), 0 8px 24px -12px rgba(11,22,38,0.18)",
-        lift: "0 2px 4px rgba(11,22,38,0.05), 0 18px 40px -18px rgba(11,22,38,0.28)",
+        // Hard offset shadows (no blur) — the brutalist signature. Cast in
+        // `--c-ink` so they invert with the theme (near-black in light, a
+        // crisp white ledge in dark). `card`/`lift` keep their names so every
+        // existing call site flips automatically.
+        card: "3px 3px 0 0 rgb(var(--c-ink) / 0.9)",
+        lift: "6px 6px 0 0 rgb(var(--c-ink))",
+        brutal: "4px 4px 0 0 rgb(var(--c-ink))",
+        "brutal-sm": "2px 2px 0 0 rgb(var(--c-ink))",
+        "brutal-lg": "8px 8px 0 0 rgb(var(--c-ink))",
+        "brutal-gold": "4px 4px 0 0 rgb(var(--c-gold-500))",
       },
       maxWidth: { content: "72rem" },
     },

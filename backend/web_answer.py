@@ -1,9 +1,3 @@
-"""Graceful out-of-scope answer: web search + LLM summary with source links.
-
-Used when the router classifies a question as non-legal — instead of dead-ending
-the user, we search the web and summarise the real results, clearly framed as
-general info (not legal advice) with citations the user can click through.
-"""
 from __future__ import annotations
 
 import logging
@@ -16,7 +10,6 @@ log = logging.getLogger("legally.webanswer")
 
 
 def answer(question: str) -> dict:
-    """Return {"answer": str|None, "sources": [{title,snippet,url}]}."""
     sources = web_search.search(question, n=5)
     if not sources:
         return {"answer": None, "sources": []}
@@ -33,7 +26,8 @@ def answer(question: str) -> dict:
             system=system,
             user=user,
             temperature=0.3,
-            max_tokens=600,
+            max_tokens=1200,
+            reasoning_effort="low",
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("Web answer synthesis failed: %s", e)

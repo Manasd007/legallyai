@@ -1,10 +1,3 @@
-"""Reconstruct a full judgment from its indexed chunks, for the "read the whole
-case with the cited passage highlighted" view (provenance deep-dive).
-
-The corpus index stores every judgment as ordered chunks in the metadata table.
-We filter to one case, restore document order, and flag the chunk that grounded a
-citation so the UI can highlight it in context.
-"""
 from __future__ import annotations
 
 import re
@@ -18,7 +11,6 @@ def _norm(s: str) -> str:
 
 
 def _order_key(chunk_id: str) -> int:
-    # ids look like "{stem}:{global_row}"; the trailing number is document order.
     try:
         return int(str(chunk_id).rsplit(":", 1)[-1])
     except (ValueError, IndexError):
@@ -36,7 +28,7 @@ def get_case(citation: str = "", case_name: str = "", highlight_id: str = "") ->
     cites = meta["citation"].fillna("").map(_norm)
     names = meta["case_name"].fillna("").map(_norm)
     mask = (cites == cite_n) if cite_n else (names == name_n)
-    if cite_n and not mask.any():  # citation missing/blank in meta — fall back to name
+    if cite_n and not mask.any():
         mask = names == name_n
     sub = meta[mask]
     if sub.empty:

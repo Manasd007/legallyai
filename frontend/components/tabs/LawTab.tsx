@@ -7,6 +7,7 @@ import { useSession } from "@/components/session";
 import { FadeUp } from "@/components/motion";
 import { CopyButton } from "@/components/CopyButton";
 import { postJson } from "@/components/api";
+import { TabIntro } from "@/components/tabs/TabIntro";
 import type { StoredMessage } from "@/components/tabs/types";
 
 type Statute = { act: string; section: string; what_it_governs: string; relevance: string };
@@ -81,45 +82,46 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
     }
   }
 
+  const inputCard = (
+    <div className="card p-0">
+      <textarea
+        className="w-full resize-none rounded-t-lg border-0 bg-transparent p-5 text-sm leading-relaxed text-ink outline-none placeholder:text-ink/40"
+        rows={2}
+        placeholder="e.g. A cheque I received for Rs 5 lakh bounced due to insufficient funds…"
+        value={question}
+        onChange={(e) => setQuestion(e.target.value)}
+      />
+      <div className="flex items-center justify-end gap-3 border-t-2 border-ink/15 px-5 py-3">
+        <button className="btn-primary" onClick={submit} disabled={loading || !question.trim()}>
+          {loading ? "Finding…" : "Find the law"}
+          {!loading && <ArrowIcon />}
+        </button>
+      </div>
+    </div>
+  );
+
+  if (!res && !loading) {
+    return (
+      <TabIntro
+        icon={BookIcon}
+        title="Find the law"
+        subtitle="Describe your situation and we'll point you to the Indian laws that apply, what each one means, and the Supreme Court cases behind them."
+        composer={inputCard}
+        notice={
+          error ? (
+            <p className="mt-4 rounded border-2 border-red-400 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </p>
+          ) : undefined
+        }
+        examples={EXAMPLES.map((ex) => ({ label: ex, onClick: () => setQuestion(ex) }))}
+      />
+    );
+  }
+
   return (
     <div className="w-full">
-      <p className="max-w-2xl text-sm leading-relaxed text-ink/65">
-        Describe your situation. We&apos;ll point you to the Indian laws most likely to apply,
-        explain what each one means, and show real Supreme Court cases that have applied them.
-      </p>
-
-      {!res && !loading && (
-        <div className="mt-6">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-ink/45">Try an example</p>
-          <div className="flex flex-wrap gap-2">
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex}
-                onClick={() => setQuestion(ex)}
-                className="rounded-full border border-ink/15 bg-surface/60 px-3.5 py-1.5 text-left text-xs text-ink/65 transition hover:border-ink/30 hover:text-ink"
-              >
-                {ex}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="mt-5 card p-0">
-        <textarea
-          className="w-full resize-none rounded-t-2xl border-0 bg-transparent p-5 text-sm leading-relaxed text-ink outline-none placeholder:text-ink/40"
-          rows={2}
-          placeholder="e.g. A cheque I received for Rs 5 lakh bounced due to insufficient funds…"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-        />
-        <div className="flex items-center justify-end gap-3 border-t border-ink/10 px-5 py-3">
-          <button className="btn-primary" onClick={submit} disabled={loading || !question.trim()}>
-            {loading ? "Finding…" : "Find the law"}
-            {!loading && <ArrowIcon />}
-          </button>
-        </div>
-      </div>
+      {inputCard}
 
       {loading && (
         <div className="mt-8 card flex justify-center py-14">
@@ -127,16 +129,10 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
         </div>
       )}
 
-      {error && (
-        <p className="mt-6 rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-
       {res && (
         <FadeUp className="mt-8 space-y-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-ink/45">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
               {res.statutes.length} law{res.statutes.length === 1 ? "" : "s"} that may apply
             </span>
             {res.statutes.length > 0 && (
@@ -153,7 +149,7 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
           </div>
           {res.situation_summary && (
             <div className="card">
-              <div className="text-xs font-semibold uppercase tracking-wider text-ink/50">
+              <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/50">
                 In short
               </div>
               <p className="mt-2 text-sm leading-relaxed text-ink/75">{res.situation_summary}</p>
@@ -165,14 +161,14 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
               {res.statutes.map((s, i) => (
                 <div key={i} className="card">
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-navy-900 text-gold-400">
+                    <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded border-2 border-ink bg-navy-900 text-gold-400 shadow-brutal-sm">
                       <BookIcon className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <span className="font-serif text-lg font-semibold text-ink">{s.act}</span>
                         {s.section && (
-                          <span className="rounded-full bg-gold-400/15 px-2.5 py-0.5 text-xs font-semibold text-gold-700">
+                          <span className="rounded border-2 border-gold-500/40 bg-gold-400/15 px-2 py-0.5 font-mono text-[11px] font-semibold text-gold-700">
                             {s.section}
                           </span>
                         )}
@@ -196,7 +192,7 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
           )}
 
           {res.note && (
-            <p className="rounded-lg bg-ink/[0.04] p-3 text-xs leading-relaxed text-ink/60">{res.note}</p>
+            <p className="rounded border-2 border-ink/15 bg-ink/[0.04] p-3 text-xs leading-relaxed text-ink/60">{res.note}</p>
           )}
 
           {res.related_cases.length > 0 && (
@@ -208,7 +204,7 @@ export function LawTab({ initialMessages }: { initialMessages?: StoredMessage[] 
                 {res.related_cases.map((c, i) => (
                   <li
                     key={i}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-ink/10 bg-surface/60 px-4 py-2.5 text-sm"
+                    className="flex items-center justify-between gap-3 rounded border-2 border-ink/20 bg-surface/50 px-4 py-2.5 text-sm backdrop-blur-sm transition hover:border-ink"
                   >
                     <div className="min-w-0">
                       <div className="truncate font-medium text-ink">{c.case_name}</div>
