@@ -82,7 +82,7 @@ function DocHeader({ analysis }: { analysis: Analysis }) {
 
 function Summary({ analysis }: { analysis: Analysis }) {
   return (
-    <div className="card">
+    <div className="panel">
       <span className="inline-flex items-center gap-2 rounded border-2 border-ink/20 bg-ink/5 px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-ink/60">
         {analysis.document_type}
       </span>
@@ -101,7 +101,7 @@ function FactsGrid({ analysis }: { analysis: Analysis }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {hasParties && (
-        <div className="card min-w-0">
+        <div className="panel min-w-0">
           <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">Parties</h3>
           <ul className="mt-3 space-y-3">
             {analysis.parties.map((p, i) => (
@@ -116,7 +116,7 @@ function FactsGrid({ analysis }: { analysis: Analysis }) {
         </div>
       )}
       {hasDates && (
-        <div className="card min-w-0">
+        <div className="panel min-w-0">
           <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">Key dates</h3>
           <ul className="mt-3 space-y-3">
             {analysis.key_dates.map((d, i) => (
@@ -132,7 +132,7 @@ function FactsGrid({ analysis }: { analysis: Analysis }) {
         </div>
       )}
       {hasAmounts && (
-        <div className="card min-w-0">
+        <div className="panel min-w-0">
           <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">Amounts</h3>
           <ul className="mt-3 space-y-3">
             {analysis.amounts.map((a, i) => (
@@ -148,7 +148,7 @@ function FactsGrid({ analysis }: { analysis: Analysis }) {
         </div>
       )}
       {hasLaw && (
-        <div className={`card min-w-0 ${hasAmounts ? "" : "sm:col-span-2"}`}>
+        <div className={`panel min-w-0 ${hasAmounts ? "" : "sm:col-span-2"}`}>
           <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">Governing law</h3>
           <p className="mt-3 text-sm leading-relaxed text-ink/80">{analysis.governing_law}</p>
         </div>
@@ -160,7 +160,7 @@ function FactsGrid({ analysis }: { analysis: Analysis }) {
 function WhereYouStand({ analysis }: { analysis: Analysis }) {
   if (!analysis.your_position) return null;
   return (
-    <div className="card border-2 border-gold-500/50 bg-gold-400/[0.06]">
+    <div className="panel border-gold-500/25 bg-gold-400/[0.05]">
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-700">
           Where you stand
@@ -200,7 +200,7 @@ const URGENCY: Record<Deadline["urgency"], { label: string; cls: string; dot: st
 function Deadlines({ items }: { items: Deadline[] }) {
   if (!items || items.length === 0) return null;
   return (
-    <div className="card">
+    <div className="panel">
       <h2 className="font-serif text-lg font-semibold text-ink">Deadlines &amp; time limits</h2>
       <p className="mt-1 text-xs text-ink/55">
         Act on these in time, missing them can have legal consequences.
@@ -209,7 +209,7 @@ function Deadlines({ items }: { items: Deadline[] }) {
         {items.map((d, i) => {
           const u = URGENCY[d.urgency] ?? URGENCY.important;
           return (
-            <div key={i} className={`flex items-start gap-3 rounded border-2 p-3.5 ${u.cls}`}>
+            <div key={i} className={`flex items-start gap-3 rounded-[10px] border p-3.5 ${u.cls}`}>
               <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${u.dot}`} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-ink">{d.action}</div>
@@ -237,7 +237,7 @@ function Deadlines({ items }: { items: Deadline[] }) {
 function RecommendedActions({ steps }: { steps: string[] }) {
   if (!steps || steps.length === 0) return null;
   return (
-    <div className="card border-2 border-gold-500/50 bg-gold-400/[0.06]">
+    <div className="panel border-gold-500/25 bg-gold-400/[0.05]">
       <h2 className="font-serif text-lg font-semibold text-ink">What you should do next</h2>
       <p className="mt-1 text-xs text-ink/60">
         Practical steps based on this document, in priority order. Worth confirming with an advocate.
@@ -259,7 +259,7 @@ function RecommendedActions({ steps }: { steps: string[] }) {
 function YourOptions({ options }: { options: Option[] }) {
   if (!options || options.length === 0) return null;
   return (
-    <div className="card">
+    <div className="panel">
       <h2 className="font-serif text-lg font-semibold text-ink">Your options</h2>
       <p className="mt-1 text-xs text-ink/55">
         Routes open to you on the face of this document, things to consider, not directions.
@@ -278,7 +278,7 @@ function YourOptions({ options }: { options: Option[] }) {
 
 function InjectionNotice({ text }: { text: string }) {
   return (
-    <div className="flex items-start gap-3 rounded border-2 border-red-500/50 bg-red-500/[0.06] p-4">
+    <div className="flex items-start gap-3 rounded-[10px] border border-red-500/40 bg-red-500/[0.06] p-4">
       <ShieldCheckIcon className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
       <div className="text-sm leading-relaxed text-ink/80">
         <span className="font-semibold text-ink">Security note. </span>
@@ -291,7 +291,7 @@ function InjectionNotice({ text }: { text: string }) {
 function KeyPoints({ points }: { points: KeyPoint[] }) {
   if (points.length === 0) return null;
   return (
-    <div className="card">
+    <div className="panel">
       <h2 className="font-serif text-lg font-semibold text-ink">Key terms</h2>
       <div className="mt-4 space-y-4">
         {points.map((p, i) => (
@@ -311,7 +311,7 @@ function ObligationsRisks({ analysis }: { analysis: Analysis }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {obligations.length > 0 && (
-        <div className="card">
+        <div className="panel">
           <h3 className="text-sm font-semibold text-ink">Obligations</h3>
           <ul className="mt-3 space-y-2 text-sm text-ink/75">
             {obligations.map((o, i) => (
@@ -324,7 +324,7 @@ function ObligationsRisks({ analysis }: { analysis: Analysis }) {
         </div>
       )}
       {risks_or_flags.length > 0 && (
-        <div className="card border-2 border-gold-500/50 bg-gold-400/[0.06]">
+        <div className="panel border-gold-500/25 bg-gold-400/[0.05]">
           <h3 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <ShieldCheckIcon className="h-4 w-4 text-gold-600" /> Worth attention
           </h3>
@@ -367,7 +367,7 @@ function LegalTerms({ docId, glossary }: { docId: string; glossary: Term[] }) {
   if (glossary.length === 0) return null;
 
   return (
-    <div className="card">
+    <div className="panel">
       <h2 className="font-serif text-lg font-semibold text-ink">Legal terms, explained</h2>
       <p className="mt-1 text-xs text-ink/55">
         Legal papers are full of jargon. Tap a term, or ask about any word in the document.

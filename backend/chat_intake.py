@@ -35,6 +35,7 @@ def classify(question: str, history: list[dict] | None = None) -> Mode:
             json_mode=True,
             max_tokens=512,
             reasoning_effort="low",
+            seed=get_settings().llm_seed,
         )
         text = out.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         mode = json.loads(text).get("mode")

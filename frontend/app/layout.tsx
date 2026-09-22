@@ -6,6 +6,7 @@ import { SmoothScroll } from "@/components/SmoothScroll";
 import { SessionProvider } from "@/components/session";
 import { AuthProvider } from "@/components/auth";
 import { RouteLoader } from "@/components/RouteLoader";
+import { Analytics } from "@vercel/analytics/next";
 
 const mono = IBM_Plex_Mono({
  subsets: ["latin"],
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
  <SmoothScroll>{children}</SmoothScroll>
  </SessionProvider>
  </AuthProvider>
+ <Analytics />
  </body>
  </html>
  );

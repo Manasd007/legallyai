@@ -219,10 +219,11 @@ def analyze(text: str) -> dict:
                 model=model,
                 system=system,
                 user=user if attempt == 0 else user + "\n\nReturn VALID JSON ONLY.",
-                temperature=0.2,
+                temperature=0.0,
                 json_mode=True,
                 max_tokens=3200,
                 reasoning_effort="low",
+                seed=s.llm_seed,
             )
             return _normalize(json.loads(_strip_fences(raw)), truncated, injection_flag)
         except json.JSONDecodeError as e:
@@ -255,9 +256,10 @@ def chat(doc: dict, question: str, history: list[dict]) -> str:
             model=s.reasoning_model,
             system=system,
             user=user,
-            temperature=0.2,
+            temperature=0.0,
             max_tokens=1500,
             reasoning_effort="low",
+            seed=s.llm_seed,
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("Doc chat failed: %s", e)
@@ -283,9 +285,10 @@ def explain_term(doc: dict, term: str) -> str:
             model=s.reasoning_model,
             system=system,
             user=user,
-            temperature=0.2,
+            temperature=0.0,
             max_tokens=700,
             reasoning_effort="low",
+            seed=s.llm_seed,
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("Doc term explanation failed: %s", e)

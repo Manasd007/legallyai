@@ -44,6 +44,7 @@ def classify(question: str) -> RouteResult:
             json_mode=True,
             max_tokens=512,
             reasoning_effort="low",
+            seed=get_settings().llm_seed,
         )
         return _safe_parse(out)
     except Exception as e:  # noqa: BLE001

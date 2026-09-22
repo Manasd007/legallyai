@@ -131,9 +131,13 @@ function Workspace() {
   return (
     <WorkspaceShell>
 
-      <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-6 lg:px-8">
+      <main
+        className={`mx-auto flex min-h-screen w-full flex-col px-6 py-6 lg:px-8 ${
+          active === "assess" ? "max-w-5xl" : "max-w-3xl"
+        }`}
+      >
 
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-4 border-b-2 border-ink pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-4 border-b border-ink/10 pb-4">
           <div role="tablist" aria-label="Workspace tools" className="flex flex-wrap gap-2">
           {TABS.map((t) => {
             const Icon = t.icon;
