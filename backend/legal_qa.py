@@ -83,9 +83,10 @@ def _smalltalk(question: str, history: list[dict]) -> dict:
             model=s.reasoning_model,
             system=load_prompt("chat_smalltalk_v1.txt"),
             user=user,
-            temperature=0.4,
+            temperature=0.0,
             max_tokens=600,
             reasoning_effort="low",
+            seed=s.llm_seed,
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("smalltalk reply failed: %s", e)
@@ -104,9 +105,10 @@ def _general(question: str, history: list[dict]) -> dict:
             model=s.reasoning_model,
             system=load_prompt("general_legal_v2.txt"),
             user=user,
-            temperature=0.3,
+            temperature=0.0,
             max_tokens=1000,
             reasoning_effort="low",
+            seed=s.llm_seed,
         ).strip()
     except Exception as e:  # noqa: BLE001
         log.error("general reply failed: %s", e)
@@ -167,9 +169,10 @@ def _grounded(question: str, history: list[dict]) -> dict:
                 model=s.reasoning_model,
                 system=system,
                 user=user,
-                temperature=0.25,
+                temperature=0.0,
                 max_tokens=1600,
                 reasoning_effort="low",
+                seed=s.llm_seed,
             ).strip()
         except Exception as e:  # noqa: BLE001
             log.error("Legal QA failed: %s", e)

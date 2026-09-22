@@ -1,14 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
 
 const ColorBends = dynamic(() => import("@/components/ColorBends"), { ssr: false });
 
+const CALM_ROUTES = ["/workspace", "/predict", "/assistant", "/statutes", "/documents", "/history"];
+
 export function Background() {
   const reduce = useReducedMotion();
+  const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -22,7 +26,8 @@ export function Background() {
     return () => observer.disconnect();
   }, []);
 
-  if (!mounted || reduce) return null;
+  const calm = CALM_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
+  if (!mounted || reduce || calm) return null;
 
   const palette = isDark
     ? { colors: ["#9db2a3", "#b5c8bc", "#afc4b6"], noise: 0, intensity: 0.7 }

@@ -193,6 +193,7 @@ def _llm_critique(question: str, context_block: str, draft: str, det: dict) -> C
             json_mode=True,
             max_tokens=1200,
             reasoning_effort="low",
+            seed=get_settings().llm_seed,
         )
         data = json.loads(_strip_fences(raw))
         verdict = data.get("verdict")
@@ -262,8 +263,10 @@ def review(
         crit["verdict"] = "revise"
         det_feedback = " ".join(hard_issues)
         crit["feedback"] = (det_feedback + " " + crit["feedback"]).strip()
-    if ceiling:
-        crit["max_confidence"] = _cap_confidence(crit["max_confidence"], ceiling)
+    else:
+        crit["verdict"] = "pass"
+
+    crit["max_confidence"] = ceiling
     return crit
 
 

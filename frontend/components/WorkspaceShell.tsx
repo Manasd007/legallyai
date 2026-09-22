@@ -16,12 +16,29 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
  const router = useRouter();
  const { user, ready, enabled } = useAuth();
  const [open, setOpen] = useState(false);
+ const [collapsed, setCollapsed] = useState(false);
 
  useScrollLock(open);
 
  useEffect(() => {
  setOpen(false);
  }, [pathname]);
+
+ useEffect(() => {
+ try {
+ setCollapsed(localStorage.getItem("ws-sidebar-collapsed") === "1");
+ } catch {}
+ }, []);
+
+ function toggleCollapsed() {
+ setCollapsed((v) => {
+ const next = !v;
+ try {
+ localStorage.setItem("ws-sidebar-collapsed", next ? "1" : "0");
+ } catch {}
+ return next;
+ });
+ }
 
  useEffect(() => {
  if (enabled && ready && !user) {
@@ -56,9 +73,27 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
  </div>
  </div>
 
- <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r-2 border-ink bg-surface/55 backdrop-blur-md lg:flex">
- <SidebarContent />
+ <aside
+ className={`fixed inset-y-0 left-0 z-30 hidden w-72 flex-col border-r border-ink/10 bg-surface/70 backdrop-blur-md ${
+ collapsed ? "lg:hidden" : "lg:flex"
+ }`}
+ >
+ <SidebarContent onCollapse={toggleCollapsed} />
  </aside>
+
+ {collapsed && (
+ <button
+ onClick={toggleCollapsed}
+ aria-label="Show sidebar"
+ title="Show sidebar"
+ className="fixed left-4 top-4 z-30 hidden h-9 w-9 place-items-center rounded-lg border border-ink/15 bg-surface/80 text-ink/70 shadow-sm backdrop-blur-md transition hover:text-ink lg:grid"
+ >
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+ strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+ <path d="M4 6h16M4 12h16M4 18h16" />
+ </svg>
+ </button>
+ )}
 
  {open && (
  <div className="fixed inset-0 z-50 lg:hidden">
@@ -69,10 +104,12 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
  </div>
  )}
 
-      <div className="relative min-h-screen lg:pl-72">
+      <div className={`relative min-h-screen ${collapsed ? "lg:pl-0" : "lg:pl-72"}`}>
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-y-0 left-0 right-0 z-0 bg-parchment/30 backdrop-blur-[10px] lg:left-72"
+          className={`pointer-events-none fixed inset-y-0 right-0 z-0 bg-parchment/85 ${
+            collapsed ? "left-0" : "left-0 lg:left-72"
+          }`}
         />
         <div className="relative z-[1]">{children}</div>
       </div>
@@ -82,16 +119,33 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
 function SidebarContent({
  onNavigate,
+ onCollapse,
 }: {
  onNavigate?: () => void;
+ onCollapse?: () => void;
 }) {
  return (
  <div className="flex h-full flex-col gap-5 p-5">
  <div className="flex items-center justify-between">
  <Logo withText textClassName="text-2xl" />
+ <div className="flex items-center gap-1">
  <span className="hidden lg:block">
  <ThemeToggle />
  </span>
+ {onCollapse && (
+ <button
+ onClick={onCollapse}
+ aria-label="Hide sidebar"
+ title="Hide sidebar"
+ className="hidden h-8 w-8 place-items-center rounded-lg border border-transparent text-ink/45 transition hover:border-ink/15 hover:bg-ink/[0.05] hover:text-ink lg:grid"
+ >
+ <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+ strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+ <path d="M15 18l-6-6 6-6" />
+ </svg>
+ </button>
+ )}
+ </div>
  </div>
 
  <MatterPanel onNavigate={onNavigate} />

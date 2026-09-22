@@ -174,4 +174,18 @@ h1, h2, h3 {
   .hairline {
     @apply border-ink/15;
   }
+
+  .panel {
+    @apply rounded-[14px] border border-ink/[0.09] bg-surface/85 p-5 backdrop-blur-sm;
+    box-shadow: 0 1px 2px rgb(var(--c-ink) / 0.04), 0 14px 32px -20px rgb(var(--c-ink) / 0.28);
+  }
+
+  .panel-hero {
+    @apply rounded-[18px] border border-ink/[0.09] bg-surface/90 p-6 backdrop-blur-sm sm:p-7;
+    box-shadow: 0 1px 2px rgb(var(--c-ink) / 0.05), 0 24px 48px -24px rgb(var(--c-ink) / 0.32);
+  }
+
+  .panel-label {
+    @apply font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-ink/45;
+  }
 }

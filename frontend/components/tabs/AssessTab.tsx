@@ -494,32 +494,45 @@ export function AssessTab({ initialMessages }: { initialMessages?: StoredMessage
         />
       ) : (
         <>
-          <div className="flex justify-end">
+          <div className="mx-auto flex w-full max-w-3xl justify-end">
             <button onClick={startOver} className="btn-ghost shrink-0 px-3 py-2 text-xs">
               Start over
             </button>
           </div>
 
-          <div className="mt-2 flex-1 space-y-6 pb-4">
-            {items.map((it) => (
-              <Row
-                key={it.id}
-                item={it}
-
-                onFullAssessment={
-                  it.id === offerAssessmentOn && !loading ? runFullAssessment : undefined
-                }
-              />
-            ))}
+          <div className="mt-2 flex-1 space-y-6 pb-36">
+            {items.map((it) => {
+              const wide = it.role === "assistant" && (it.kind === "prediction" || it.kind === "doc");
+              return (
+                <div key={it.id} className={wide ? "w-full" : "mx-auto w-full max-w-3xl"}>
+                  <Row
+                    item={it}
+                    onFullAssessment={
+                      it.id === offerAssessmentOn && !loading ? runFullAssessment : undefined
+                    }
+                  />
+                </div>
+              );
+            })}
             {!loading && latestDoc && (
-              <DocFollowUp analysis={latestDoc.analysis} onAssess={assessDoc} onAsk={askDoc} />
+              <div className="mx-auto w-full max-w-3xl">
+                <DocFollowUp analysis={latestDoc.analysis} onAssess={assessDoc} onAsk={askDoc} />
+              </div>
             )}
-            {loading && <Thinking />}
+            {loading && (
+              <div className="mx-auto w-full max-w-3xl">
+                <Thinking />
+              </div>
+            )}
 
-            <LiveTurns turns={voice.turns} />
+            <div className="mx-auto w-full max-w-3xl">
+              <LiveTurns turns={voice.turns} />
+            </div>
             <div ref={endRef} />
           </div>
-          <div className="sticky bottom-4 pt-2">{composer}</div>
+          <div className="pointer-events-none sticky bottom-0 z-10 -mx-6 bg-gradient-to-t from-parchment via-parchment/95 to-transparent px-6 pb-4 pt-6 lg:-mx-8 lg:px-8">
+            <div className="pointer-events-auto mx-auto w-full max-w-3xl">{composer}</div>
+          </div>
         </>
       )}
 
@@ -626,7 +639,7 @@ function DocFollowUp({
   if (questions.length === 0 && !analysis.your_position && !analysis.summary) return null;
 
   return (
-    <div className="card border-2 border-gold-500/50 bg-gold-400/[0.05]">
+    <div className="panel border-gold-500/25 bg-gold-400/[0.05]">
       <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-700">
         Keep going with this document
       </div>
@@ -814,9 +827,9 @@ function Result({ res }: { res: QueryResponse }) {
   }
   if (res.category === "general_legal") {
     return (
-      <section className="card">
-        <h2 className="font-serif text-xl font-semibold text-ink">Answer</h2>
-        <p className="mt-3 whitespace-pre-wrap leading-relaxed text-ink/80">{res.answer}</p>
+      <section className="panel">
+        <div className="panel-label">Answer</div>
+        <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink/85">{res.answer}</p>
       </section>
     );
   }
@@ -837,69 +850,84 @@ function Result({ res }: { res: QueryResponse }) {
     .filter(Boolean)
     .join("\n");
 
+  const hasFactors = !!res.key_factors && res.key_factors.length > 0;
+  const hasSteps = !!res.what_would_strengthen && res.what_would_strengthen.length > 0;
+  const hasPrecedent = !!ps?.precedent_vote?.cases && ps.precedent_vote.cases.length > 0;
+  const hasCited = !!res.cited_cases && res.cited_cases.length > 0;
+
+  const analysisCards: React.ReactNode[] = [
+    hasFactors && <StrongWeakPoints key="factors" factors={res.key_factors!} />,
+    hasSteps && <NextSteps key="steps" steps={res.what_would_strengthen!} />,
+  ].filter(Boolean);
+  const evidenceCards: React.ReactNode[] = [
+    hasPrecedent && <PrecedentList key="precedent" vote={ps!.precedent_vote!} />,
+    hasCited && <CitedPanel key="cited" cases={res.cited_cases!} verification={res.verification} />,
+  ].filter(Boolean);
+  const twoColumns = analysisCards.length > 0 && evidenceCards.length > 0;
+  const anySupporting = analysisCards.length > 0 || evidenceCards.length > 0;
+
   return (
-    <section className="space-y-5">
+    <section className="space-y-6">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">Your assessment</span>
+        <span className="panel-label flex items-center gap-2">
+          <ScalesIcon className="h-3.5 w-3.5 text-gold-600" /> Case assessment
+        </span>
         <CopyButton text={copyText} label="Copy assessment" />
       </div>
 
-      <FadeUp>
+      <FadeUp y={10}>
         <VerdictCard pct={winPct} confidence={res.confidence} precedent={ps?.precedent_vote} note={ps?.note} />
       </FadeUp>
 
       {res.reasoning && (
-        <FadeUp delay={0.08} className="card">
-          <h2 className="font-serif text-lg font-semibold text-ink">What this means for you</h2>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink/80">{res.reasoning}</p>
+        <FadeUp y={8} className="panel">
+          <div className="panel-label">What this means for you</div>
+          <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink/85">{res.reasoning}</p>
         </FadeUp>
       )}
 
-      {res.key_factors && res.key_factors.length > 0 && (
-        <FadeUp delay={0.14}>
-          <StrongWeakPoints factors={res.key_factors} />
-        </FadeUp>
-      )}
-
-      {res.what_would_strengthen && res.what_would_strengthen.length > 0 && (
-        <FadeUp delay={0.2}>
-          <NextSteps steps={res.what_would_strengthen} />
-        </FadeUp>
-      )}
-
-      {ps?.precedent_vote?.cases && ps.precedent_vote.cases.length > 0 && (
-        <FadeUp delay={0.26}>
-          <PrecedentList vote={ps.precedent_vote} />
-        </FadeUp>
-      )}
-
-      {res.cited_cases && res.cited_cases.length > 0 && (
-        <FadeUp delay={0.32} className="card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 font-serif text-lg font-semibold text-ink">
-              <ScalesIcon className="h-5 w-5 text-gold-600" /> The cases this is based on
-            </h2>
-            {res.verification && (
-              <TrustBadge verified={res.verification.verified_count} fabricated={res.verification.fabricated_count} />
-            )}
-          </div>
-          <p className="mt-1 text-xs text-ink/55">
-            Every case below is a real, indexed judgment, click any one to read it in full.
-          </p>
-          <div className="mt-3 space-y-2.5">
-            {res.cited_cases.map((c, i) => (
-              <CitedCaseCard key={i} c={c} />
-            ))}
-          </div>
+      {anySupporting && (
+        <FadeUp y={8}>
+          {twoColumns ? (
+            <div className="grid items-start gap-5 lg:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-5">{analysisCards}</div>
+              <div className="flex min-w-0 flex-col gap-5">{evidenceCards}</div>
+            </div>
+          ) : (
+            <div className="space-y-5">{[...analysisCards, ...evidenceCards]}</div>
+          )}
         </FadeUp>
       )}
 
       {ps && (
-        <FadeUp delay={0.36}>
+        <FadeUp y={8}>
           <MethodDisclosure ps={ps} />
         </FadeUp>
       )}
     </section>
+  );
+}
+
+function CitedPanel({ cases, verification }: { cases: CitedCase[]; verification?: Verification }) {
+  return (
+    <div className="panel">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-serif text-base font-semibold text-ink">
+          <ScalesIcon className="h-4 w-4 text-gold-600" /> The cases this is based on
+        </h2>
+        {verification && (
+          <TrustBadge verified={verification.verified_count} fabricated={verification.fabricated_count} />
+        )}
+      </div>
+      <p className="mt-1 text-xs text-ink/55">
+        Every case below is a real, indexed judgment, click any one to read it in full.
+      </p>
+      <div className="mt-3 space-y-2.5">
+        {cases.map((c, i) => (
+          <CitedCaseCard key={i} c={c} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -973,36 +1001,45 @@ function VerdictCard({
       : null;
 
   return (
-    <div className={`card overflow-hidden border-2 ${tone.ring}`}>
-      <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/50">Where you stand</div>
+    <div className={`panel-hero overflow-hidden border-l-[3px] ${tone.ring}`}>
+      <div className="panel-label">Where you stand</div>
 
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-        <h2 className="max-w-xl font-serif text-2xl font-semibold leading-snug text-ink sm:text-3xl">{s.headline}</h2>
-        <span className={`shrink-0 rounded border-2 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] ${tone.chip}`}>{s.word}</span>
+        <h2 className="max-w-2xl font-serif text-2xl font-semibold leading-snug text-ink sm:text-[2rem]">{s.headline}</h2>
+        <span className={`shrink-0 rounded-full border px-3 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] ${tone.chip}`}>{s.word}</span>
       </div>
 
-      {basis && <p className="mt-3 text-sm leading-relaxed text-ink/70">{basis}</p>}
+      {basis && <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink/70">{basis}</p>}
 
-      {pct !== null && (
-        <div className="mt-4">
-          <div className="flex items-baseline justify-between">
-            <span
-              className="text-sm text-ink/60"
-              title="An estimate of how often applicants in closely-matching past cases prevailed. It reflects the precedent, not a guarantee about your specific facts."
-            >
-              Estimated chance of success <span className="font-semibold text-ink">≈ {pct}%</span>
-            </span>
+      <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+        {pct !== null ? (
+          <div>
+            <div className="flex items-baseline justify-between">
+              <span
+                className="text-sm text-ink/60"
+                title="An estimate of how often applicants in closely-matching past cases prevailed. It reflects the precedent, not a guarantee about your specific facts."
+              >
+                Estimated chance of success
+              </span>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-ink/10">
+              <MotionBar pct={pct} delay={0.15} className={`h-full rounded-full bg-gradient-to-r ${tone.bar}`} />
+            </div>
+            <p className="mt-1.5 text-[11px] text-ink/45">
+              A rough estimate from how similar past cases were decided, not a promise about yours.
+            </p>
           </div>
-          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-ink/10">
-            <MotionBar pct={pct} delay={0.15} className={`h-full rounded-full bg-gradient-to-r ${tone.bar}`} />
+        ) : (
+          <div />
+        )}
+        {pct !== null && (
+          <div className="shrink-0 text-right">
+            <div className="font-serif text-4xl font-semibold leading-none text-ink tabular-nums sm:text-5xl">{pct}%</div>
           </div>
-          <p className="mt-1.5 text-[11px] text-ink/45">
-            A rough estimate from how similar past cases were decided, not a promise about yours.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="mt-4 rounded border-2 border-ink/15 bg-ink/[0.04] p-3 text-xs leading-relaxed text-ink/65">
+      <div className="mt-5 rounded-[10px] border border-ink/10 bg-ink/[0.03] p-3.5 text-xs leading-relaxed text-ink/65">
         <span className="font-semibold text-ink/80">How sure are we? </span>
         {confidenceSentence(confidence)}
         {note && <span className="mt-1 block text-ink/55">{note}</span>}
@@ -1072,22 +1109,22 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
   };
 
   return (
-    <div className="card">
+    <div className="panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-serif text-lg font-semibold text-ink">Your strong and weak points</h2>
+          <h2 className="font-serif text-base font-semibold text-ink">Your strong and weak points</h2>
           <p className="mt-1 text-xs text-ink/55">
             The factors the analogous cases turned on, weighed against your situation.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.06em]">
-          <span className="rounded border-2 border-emerald-500/50 bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
+          <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-700 dark:text-emerald-300">
             {tally.favorable} for
           </span>
-          <span className="rounded border-2 border-red-500/50 bg-red-500/10 px-2 py-0.5 text-red-600 dark:text-red-300">
+          <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-red-600 dark:text-red-300">
             {tally.unfavorable} against
           </span>
-          <span className="rounded border-2 border-ink/20 bg-ink/5 px-2 py-0.5 text-ink/55">{tally.unclear} depends</span>
+          <span className="rounded-full border border-ink/15 bg-ink/5 px-2 py-0.5 text-ink/55">{tally.unclear} depends</span>
         </div>
       </div>
 
@@ -1097,9 +1134,9 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
           return (
             <li
               key={i}
-              className={`flex items-start gap-3 rounded border-2 border-l-[6px] border-ink/20 bg-ink/[0.02] px-3.5 py-3 dark:bg-white/[0.02] ${m.rail}`}
+              className={`flex items-start gap-3 rounded-[10px] border border-l-[4px] border-ink/10 bg-ink/[0.02] px-3.5 py-3 dark:bg-white/[0.02] ${m.rail}`}
             >
-              <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded border-2 border-ink/15 ${m.iconWrap}`}>
+              <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-ink/10 ${m.iconWrap}`}>
                 <FactorIcon kind={f.assessment} />
               </span>
               <div className="min-w-0 flex-1">
@@ -1123,8 +1160,8 @@ function StrongWeakPoints({ factors }: { factors: Factor[] }) {
 
 function NextSteps({ steps }: { steps: string[] }) {
   return (
-    <div className="card border-2 border-gold-500/50 bg-gold-400/[0.06]">
-      <h2 className="font-serif text-lg font-semibold text-ink">What you can do next</h2>
+    <div className="panel border-gold-500/25 bg-gold-400/[0.05]">
+      <h2 className="font-serif text-base font-semibold text-ink">What you can do next</h2>
       <p className="mt-1 text-xs text-ink/60">
         Concrete things that helped applicants in similar cases, worth discussing with an advocate.
       </p>
@@ -1144,8 +1181,8 @@ function NextSteps({ steps }: { steps: string[] }) {
 
 function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> }) {
   return (
-    <div className="card">
-      <h2 className="font-serif text-lg font-semibold text-ink">
+    <div className="panel">
+      <h2 className="font-serif text-base font-semibold text-ink">
         Real cases like yours{" "}
         <span className="text-sm font-normal text-ink/50">
           ({vote.won} won · {vote.lost} lost)
@@ -1160,7 +1197,7 @@ function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> 
           return (
             <li
               key={i}
-              className="flex items-center justify-between gap-3 rounded border-2 border-ink/20 bg-surface/55 px-4 py-3 backdrop-blur-sm transition hover:border-ink"
+              className="flex items-center justify-between gap-3 rounded-[10px] border border-ink/10 bg-ink/[0.02] px-4 py-3 transition hover:border-ink/25"
             >
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-ink">{c.case_name}</div>
@@ -1169,8 +1206,8 @@ function PrecedentList({ vote }: { vote: NonNullable<Signals["precedent_vote"]> 
               <div className="flex shrink-0 items-center gap-3">
                 <span className="text-xs tabular-nums text-ink/50">{Math.round(c.similarity * 100)}% similar</span>
                 <span
-                  className={`rounded border-2 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] ${
-                    won ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-700" : "border-red-500/50 bg-red-500/10 text-red-600"
+                  className={`rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                    won ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700" : "border-red-500/40 bg-red-500/10 text-red-600"
                   }`}
                 >
                   {won ? "Applicant won" : "Applicant lost"}
@@ -1211,7 +1248,7 @@ function MethodDisclosure({ ps }: { ps: Signals }) {
   ];
 
   return (
-    <details className="card group">
+    <details className="panel group">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
         <span className="font-serif text-base font-semibold text-ink">How we worked this out</span>
         <span className="text-xs text-ink/50 transition group-open:hidden">Show the details</span>
@@ -1223,8 +1260,8 @@ function MethodDisclosure({ ps }: { ps: Signals }) {
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         {rows.map((r) => (
-          <div key={r.key} className="rounded border-2 border-ink/20 bg-surface/55 p-3 backdrop-blur-sm">
-            <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/50">{r.key}</div>
+          <div key={r.key} className="rounded-[10px] border border-ink/10 bg-ink/[0.02] p-3">
+            <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/50">{r.key}</div>
             <div className="mt-1.5 font-serif text-xl font-semibold text-ink">{r.value}</div>
             <div className="mt-1 text-[11px] leading-snug text-ink/55">{r.sub}</div>
           </div>
@@ -1244,12 +1281,12 @@ function OutOfScope({ res }: { res: QueryResponse }) {
         <span>{res.message}</span>
       </div>
 
-      <div className="card">
+      <div className="panel">
         <p className="whitespace-pre-wrap leading-relaxed text-ink/85">{res.answer}</p>
       </div>
 
       {res.web_sources && res.web_sources.length > 0 && (
-        <div className="card">
+        <div className="panel">
           <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/55">Sources from the web</h2>
           <ol className="mt-3 space-y-2">
             {res.web_sources.map((sourceItem, i) => (
@@ -1271,5 +1308,5 @@ function OutOfScope({ res }: { res: QueryResponse }) {
 }
 
 function Notice({ children }: { children: React.ReactNode }) {
-  return <div className="card text-ink/75">{children}</div>;
+  return <div className="panel text-ink/75">{children}</div>;
 }

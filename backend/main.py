@@ -8,6 +8,7 @@ os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 import logging
 import threading
+import time
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +24,7 @@ import doc_extract as doc_extract_mod
 import doc_store as doc_store_mod
 import ensemble as ensemble_mod
 import legal_qa as legal_qa_mod
+import parallel
 import predict as predict_mod
 import reformulate as reformulate_mod
 import retrieval as retrieval_mod
@@ -31,9 +33,17 @@ import statute_finder as statute_finder_mod
 import verify as verify_mod
 from config import get_settings, load_prompt
 from llm import complete
+from logging_setup import log_stage, new_request_id, setup_logging
+from textutil import normalize_query
 
-logging.basicConfig(level=logging.INFO)
+setup_logging()
 log = logging.getLogger("legally.main")
+
+ANSWER_CACHE_VERSION = "v3"
+
+
+def _answer_cache_key(question: str) -> str:
+    return f"{ANSWER_CACHE_VERSION}|{get_settings().corpus_revision}|{normalize_query(question)}"
 
 app = FastAPI(title="Legally AI", version="0.1.0")
 app.add_middleware(
@@ -42,6 +52,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Assign a request id and log every request's method, path, status and time.
+
+    The id is stamped on all log lines produced while handling the request
+    (including pipeline stages and LLM calls) so one request can be followed
+    end to end, and is echoed back in the ``X-Request-ID`` response header.
+    """
+    rid = new_request_id()
+    start = time.perf_counter()
+    client = request.client.host if request.client else "-"
+    log.info(">> %s %s from %s", request.method, request.url.path, client)
+    try:
+        response = await call_next(request)
+    except Exception:
+        dur = (time.perf_counter() - start) * 1000
+        log.exception("<< %s %s failed after %.0f ms", request.method, request.url.path, dur)
+        raise
+    dur = (time.perf_counter() - start) * 1000
+    log.info(
+        "<< %s %s %s in %.0f ms", request.method, request.url.path, response.status_code, dur
+    )
+    response.headers["X-Request-ID"] = rid
+    return response
 
 
 @app.exception_handler(Exception)
@@ -345,6 +381,118 @@ def retrieve_only(body: QueryBody) -> dict:
     }
 
 
+def compute_legal_prediction(question: str) -> tuple[dict, dict]:
+    """Core legal-prediction pipeline with NO cache / DB / auth side effects.
+
+    Runs reformulate -> retrieve -> precedent vote + classifier ->
+    predict_validated -> verify -> ensemble.combine -> confidence reconcile ->
+    coherence guard, and returns ``(response_without_ids, prediction)``. The
+    /api/query route wraps this with caching and persistence; the consistency
+    eval harness calls it directly so it exercises the identical logic. Raises
+    FileNotFoundError if the retrieval index is unavailable.
+    """
+    s = get_settings()
+    log.info("Legal prediction pipeline start (parallel=%s)", s.parallel_signals)
+
+    with log_stage(log, "reformulate"):
+        reformulated = reformulate_mod.reformulate(question)
+
+    clf_text = f"{question}\n\n{reformulated}".strip()
+    if s.parallel_signals:
+        with log_stage(log, "retrieve+classifier (parallel)") as st:
+            out = parallel.run_parallel(
+                {
+                    "retrieve": lambda: retrieval_mod.retrieve(reformulated, question),
+                    "classifier": lambda: classifier_mod.predict_win(clf_text),
+                }
+            )
+            result, clf = out["retrieve"], out["classifier"]
+            st["chunks"] = len(result.chunks)
+    else:
+        with log_stage(log, "retrieve") as st:
+            result = retrieval_mod.retrieve(reformulated, question)
+            st["chunks"] = len(result.chunks)
+        with log_stage(log, "classifier"):
+            clf = classifier_mod.predict_win(clf_text)
+
+    with log_stage(log, "precedent_vote"):
+        precedent = ensemble_mod.precedent_vote(result)
+
+    with log_stage(log, "predict_validated"):
+        prediction, validation = predict_mod.predict_validated(
+            reformulated, question, result, precedent=precedent, classifier=clf
+        )
+    prediction["_model_version"] = predict_mod.MODEL_VERSION
+
+    with log_stage(log, "verify"):
+        prediction = verify_mod.verify(prediction, result)
+
+    with log_stage(log, "ensemble.combine") as st:
+        combined = ensemble_mod.combine(
+            precedent=precedent,
+            llm_outcome=prediction["likely_outcome"],
+            classifier=clf,
+            llm_confidence=prediction.get("confidence"),
+        )
+        st["outcome"] = prediction.get("likely_outcome")
+        st["confidence"] = prediction.get("confidence")
+    prediction_signals = {
+        "precedent_vote": precedent,
+        "llm_forecast": {
+            "likely_outcome": prediction["likely_outcome"],
+            "label": ensemble_mod.llm_outcome_to_label(prediction["likely_outcome"]),
+        },
+        "classifier": clf,
+        **combined,
+    }
+
+    if prediction["verification"].get("hedged"):
+        prediction_signals["confidence"] = "low"
+
+    _CONF_RANK = {"low": 0, "medium": 1, "high": 2}
+    _reconciled = min(
+        prediction_signals["confidence"],
+        prediction.get("confidence", "low"),
+        key=lambda c: _CONF_RANK.get(c, 0),
+    )
+    prediction["confidence"] = _reconciled
+    prediction_signals["confidence"] = _reconciled
+
+    _llm_label = ensemble_mod.llm_outcome_to_label(prediction["likely_outcome"])
+    _final_label = prediction_signals.get("final_label")
+    _hedged = prediction["verification"].get("hedged")
+    _contradicts = (
+        _llm_label is not None and _final_label is not None and _llm_label != _final_label
+    )
+    if _hedged or prediction_signals.get("final_win_probability") is None or _contradicts:
+        prediction_signals["final_win_probability"] = None
+        prediction_signals["final_label"] = None
+        if _contradicts and not _hedged:
+            prediction_signals["note"] = (
+                "The written analysis and the analogous decided cases point in "
+                "different directions, so no single percentage is shown; treat this "
+                "as genuinely uncertain."
+            )
+
+    response = {
+        "category": "legal",
+        "situation_summary": prediction["situation_summary"],
+        "likely_outcome": prediction["likely_outcome"],
+        "confidence": prediction["confidence"],
+        "win_probability": prediction_signals["final_win_probability"],
+        "win_label": prediction_signals["final_label"],
+        "prediction_signals": prediction_signals,
+        "reasoning": prediction["reasoning"],
+        "key_factors": prediction.get("key_factors", []),
+        "what_would_strengthen": prediction.get("what_would_strengthen", []),
+        "cited_cases": prediction["cited_cases"],
+        "verification": prediction["verification"],
+        "validation": validation,
+        "disclaimer": s.disclaimer,
+    }
+    return response, prediction
+
+
 @app.post("/api/query")
 def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
     s = get_settings()
@@ -366,33 +514,42 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
         }
 
     if category == "general_legal":
-        try:
-            answer = complete(
-                model=s.reasoning_model,
-                system=load_prompt("general_legal_v2.txt"),
-                user=question,
-                temperature=0.3,
-                max_tokens=1000,
-                reasoning_effort="low",
-            ).strip()
-        except Exception as e:  # noqa: BLE001
-            log.error("general_legal answer failed: %s", e)
-            answer = "I'm unable to answer that right now. Please try again shortly."
-        gl = {"category": "general_legal", "answer": answer, "disclaimer": s.disclaimer}
+        gl_key = "general|" + _answer_cache_key(question)
+        gl = cache.get(gl_key)
+        if not gl:
+            try:
+                answer = complete(
+                    model=s.reasoning_model,
+                    system=load_prompt("general_legal_v2.txt"),
+                    user=question,
+                    temperature=0.0,
+                    max_tokens=1000,
+                    reasoning_effort="low",
+                    seed=s.llm_seed,
+                ).strip()
+                gl = {"category": "general_legal", "answer": answer, "disclaimer": s.disclaimer}
+                cache.set(gl_key, gl)
+            except Exception as e:  # noqa: BLE001
+                log.error("general_legal answer failed: %s", e)
+                gl = {
+                    "category": "general_legal",
+                    "answer": "I'm unable to answer that right now. Please try again shortly.",
+                    "disclaimer": s.disclaimer,
+                }
+        gl = {**gl}
         gl["conversation_id"] = db.record_turn(
             user_id=user_id,
             conversation_id=body.conversation_id,
             tool="predict",
             user_text=question,
-            assistant_text=answer,
+            assistant_text=gl["answer"],
             payload=gl,
             session_id=body.session_id,
         )
         return gl
 
-    reformulated = reformulate_mod.reformulate(question)
-
-    cached = cache.get(reformulated)
+    cache_key = _answer_cache_key(question)
+    cached = cache.get(cache_key)
     if cached:
         conversation_id = db.record_turn(
             user_id=user_id,
@@ -406,59 +563,13 @@ def query(body: QueryBody, user_id: str = Depends(get_user_id)) -> dict:
         return {**cached, "conversation_id": conversation_id}
 
     try:
-        result = retrieval_mod.retrieve(reformulated, question)
+        response, prediction = compute_legal_prediction(question)
     except FileNotFoundError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    precedent = ensemble_mod.precedent_vote(result)
-    clf = classifier_mod.predict_win(reformulated)
-
-    prediction, validation = predict_mod.predict_validated(
-        reformulated, question, result, precedent=precedent, classifier=clf
-    )
-    prediction["_model_version"] = predict_mod.MODEL_VERSION
-
-    prediction = verify_mod.verify(prediction, result)
-
-    combined = ensemble_mod.combine(
-        precedent=precedent,
-        llm_outcome=prediction["likely_outcome"],
-        classifier=clf,
-        llm_confidence=prediction.get("confidence"),
-    )
-    prediction_signals = {
-        "precedent_vote": precedent,
-        "llm_forecast": {
-            "likely_outcome": prediction["likely_outcome"],
-            "label": ensemble_mod.llm_outcome_to_label(prediction["likely_outcome"]),
-        },
-        "classifier": clf,
-        **combined,
-    }
-
-    if prediction["verification"].get("hedged"):
-        prediction_signals["confidence"] = "low"
-
     case_id = db.persist_query(user_id=user_id, raw_text=question, prediction=prediction)
-
-    response = {
-        "category": "legal",
-        "situation_summary": prediction["situation_summary"],
-        "likely_outcome": prediction["likely_outcome"],
-        "confidence": prediction["confidence"],
-        "win_probability": prediction_signals["final_win_probability"],
-        "win_label": prediction_signals["final_label"],
-        "prediction_signals": prediction_signals,
-        "reasoning": prediction["reasoning"],
-        "key_factors": prediction.get("key_factors", []),
-        "what_would_strengthen": prediction.get("what_would_strengthen", []),
-        "cited_cases": prediction["cited_cases"],
-        "verification": prediction["verification"],
-        "validation": validation,
-        "disclaimer": s.disclaimer,
-        "case_id": case_id,
-    }
-    cache.set(reformulated, response)
+    response["case_id"] = case_id
+    cache.set(cache_key, response)
     conversation_id = db.record_turn(
         user_id=user_id,
         conversation_id=body.conversation_id,

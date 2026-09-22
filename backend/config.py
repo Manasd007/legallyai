@@ -72,6 +72,8 @@ class Settings(BaseModel):
         "openrouter/meta-llama/llama-3.1-8b-instruct:free",
     )
 
+    llm_seed: int = int(_get("LLM_SEED", "7"))
+
     conduit_base_url: str = _get("CONDUIT_BASE_URL")
     conduit_api_key: str = _get("CONDUIT_API_KEY")
     conduit_model_map: dict[str, str] = _get_map(
@@ -83,6 +85,8 @@ class Settings(BaseModel):
     supabase_anon_key: str = _get("SUPABASE_ANON_KEY")
     supabase_service_key: str = _get("SUPABASE_SERVICE_KEY")
     supabase_jwt_secret: str = _get("SUPABASE_JWT_SECRET")
+
+    parallel_signals: bool = _get_bool("PARALLEL_SIGNALS", True)
 
     validation_enabled: bool = _get_bool("VALIDATION_ENABLED", True)
     validator_model: str = _get("VALIDATOR_MODEL", _get("ROUTER_MODEL", "groq/openai/gpt-oss-20b"))

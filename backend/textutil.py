@@ -58,6 +58,25 @@ def normalize_text(text: str) -> str:
     return text.translate(_PUNCT_MAP)
 
 
+_QUERY_TRAIL = re.compile(r"[\s!?.,;:'\"~*_)(\-]+$")
+_QUERY_LEAD = re.compile(r"^[\s!?.,;:'\"~*_)(\-]+")
+_QUERY_WS = re.compile(r"\s+")
+
+
+def normalize_query(text: str) -> str:
+    """Canonical form of a user question, used as the cache/retrieval key.
+
+    Two questions that differ only in casing, surrounding punctuation, smart
+    quotes, or internal whitespace collapse to the same string, so trivial
+    rewordings ("Can I appeal?" / "can i appeal") hit the same cached answer
+    and drive the same retrieval instead of re-rolling the LLM pipeline.
+    """
+    t = normalize_text(text or "").lower()
+    t = _QUERY_WS.sub(" ", t).strip()
+    t = _QUERY_LEAD.sub("", _QUERY_TRAIL.sub("", t))
+    return t
+
+
 def is_smalltalk(text: str) -> bool:
     t = (text or "").strip().lower()
     if not t:

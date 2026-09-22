@@ -62,10 +62,11 @@ def find(question: str) -> dict:
                 model=s.reasoning_model,
                 system=system,
                 user=user if attempt == 0 else user + "\n\nReturn VALID JSON ONLY.",
-                temperature=0.2,
+                temperature=0.0,
                 json_mode=True,
                 max_tokens=2400,
                 reasoning_effort="low",
+                seed=s.llm_seed,
             )
             out = _normalize(json.loads(_strip_fences(raw)))
             break

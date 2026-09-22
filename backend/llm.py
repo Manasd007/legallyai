@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from config import get_settings
 
@@ -10,6 +11,7 @@ try:
     import litellm  # type: ignore
 
     litellm.suppress_debug_info = True
+    litellm.drop_params = True
 except Exception:  # pragma: no cover - import guard for skeleton/dev envs
     litellm = None
 
@@ -53,6 +55,7 @@ def complete(
     json_mode: bool = False,
     max_tokens: int | None = None,
     reasoning_effort: str | None = None,
+    seed: int | None = None,
 ) -> str:
     if litellm is None:
         raise LLMError(
@@ -71,13 +74,18 @@ def complete(
         kwargs["response_format"] = {"type": "json_object"}
     if reasoning_effort:
         kwargs["reasoning_effort"] = reasoning_effort
+    if seed is not None:
+        kwargs["seed"] = seed
 
     s = get_settings()
     candidates = [model, s.fallback_model]
     last_err: Exception | None = None
+    approx_prompt = sum(len(m["content"]) for m in messages)
 
-    for candidate in candidates:
+    for attempt, candidate in enumerate(candidates):
         target, target_kwargs = _target_for(candidate)
+        is_fallback = attempt > 0
+        start = time.perf_counter()
         try:
             resp = litellm.completion(
                 model=target,
@@ -85,10 +93,40 @@ def complete(
                 **target_kwargs,
                 **kwargs,
             )
+            dur = (time.perf_counter() - start) * 1000
+            usage = _usage(resp)
+            log.info(
+                "LLM %s%s ok in %.0f ms (prompt=%s completion=%s total=%s, ~%d chars in)",
+                candidate,
+                " [FALLBACK]" if is_fallback else "",
+                dur,
+                usage.get("prompt_tokens", "?"),
+                usage.get("completion_tokens", "?"),
+                usage.get("total_tokens", "?"),
+                approx_prompt,
+            )
+            if is_fallback:
+                log.warning("Served via fallback model %s (primary %s failed)", candidate, model)
             return resp["choices"][0]["message"]["content"]
         except Exception as e:  # noqa: BLE001 - we deliberately try the fallback
-            log.warning("LLM call failed on %s (via %s): %s", candidate, target, e)
+            dur = (time.perf_counter() - start) * 1000
+            log.warning(
+                "LLM call failed on %s (via %s) after %.0f ms: %s", candidate, target, dur, e
+            )
             last_err = e
             continue
 
     raise LLMError(f"All LLM providers failed; last error: {last_err}")
+
+
+def _usage(resp: object) -> dict:
+    """Best-effort token usage from a litellm response (shape varies by provider)."""
+    try:
+        usage = resp.get("usage") if isinstance(resp, dict) else getattr(resp, "usage", None)
+        if usage is None:
+            return {}
+        if not isinstance(usage, dict):
+            usage = getattr(usage, "model_dump", lambda: dict(usage))()
+        return usage or {}
+    except Exception:  # noqa: BLE001 - usage is diagnostics only, never fatal
+        return {}

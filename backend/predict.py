@@ -149,9 +149,11 @@ def predict(
         user += (
             "\n\n# REVIEWER FEEDBACK ON YOUR PREVIOUS DRAFT (correct these):\n"
             + feedback
-            + "\nGround every claim strictly in the RETRIEVED SOURCES, remove or hedge "
-            "anything they do not support, lower confidence if the evidence is thin, "
-            "and prefer 'Uncertain' over a forced verdict. Return the JSON again."
+            + "\nGround every claim strictly in the RETRIEVED SOURCES and remove or hedge "
+            "anything they do not support. Keep your Granted/Dismissed lean if the "
+            "analogous cases still point one way, lowering confidence rather than "
+            "retreating to 'Uncertain'; use 'Uncertain' only when the sources are "
+            "genuinely too sparse or conflicting to lean either way. Return the JSON again."
         )
 
     model = get_settings().reasoning_model
@@ -161,10 +163,11 @@ def predict(
                 model=model,
                 system=system,
                 user=user if attempt == 0 else user + "\n\nReturn VALID JSON ONLY.",
-                temperature=0.25,
+                temperature=0.0,
                 json_mode=True,
                 max_tokens=2400,
                 reasoning_effort="low",
+                seed=get_settings().llm_seed,
             )
             data = json.loads(_strip_fences(raw))
             return _normalize(data)

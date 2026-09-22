@@ -19,18 +19,6 @@ def llm_outcome_to_label(likely_outcome: str) -> int | None:
     return {"Granted": 1, "Dismissed": 0}.get(likely_outcome)
 
 
-_LLM_PROB = {
-    ("Granted", "high"): 0.85, ("Granted", "medium"): 0.72, ("Granted", "low"): 0.60,
-    ("Dismissed", "high"): 0.15, ("Dismissed", "medium"): 0.28, ("Dismissed", "low"): 0.40,
-}
-
-
-def llm_outcome_to_prob(likely_outcome: str, confidence: str | None) -> float | None:
-    if likely_outcome not in ("Granted", "Dismissed"):
-        return None
-    return _LLM_PROB.get((likely_outcome, confidence or "low"), 0.5)
-
-
 def precedent_vote(result: RetrievalResult) -> dict:
     s = get_settings()
     by_case: dict[str, object] = {}
@@ -80,14 +68,14 @@ def precedent_vote(result: RetrievalResult) -> dict:
     }
 
 
-def _confidence(n_signals: int, agree: bool) -> str:
-    if n_signals == 0:
+def _confidence(n_signals: int, agree: bool, final_prob: float | None, precedent: dict) -> str:
+    if n_signals == 0 or not agree:
         return "low"
-    if not agree:
-        return "low"
-    if n_signals >= 3:
+    decisive = final_prob is not None and abs(final_prob - 0.5) >= 0.15
+    strong_precedent = bool(precedent.get("applicable")) and precedent.get("n_cases", 0) >= 3
+    if n_signals >= 3 and decisive and strong_precedent:
         return "high"
-    if n_signals == 2:
+    if n_signals >= 2:
         return "medium"
     return "low"
 
@@ -99,58 +87,66 @@ def combine(
     classifier: dict | None,
     llm_confidence: str | None = None,
 ) -> dict:
-    probs: list[float] = []
+    grounded: list[tuple[float, float]] = []
     labels: list[int] = []
     used: list[str] = []
 
     if precedent.get("applicable") and precedent.get("win_probability") is not None:
         p = float(precedent["win_probability"])
-        probs.append(p)
+        grounded.append((p, float(min(precedent.get("n_cases", 0), 5) or 1)))
         labels.append(1 if p >= 0.5 else 0)
         used.append("precedent_vote")
 
     llm_label = llm_outcome_to_label(llm_outcome)
-    llm_prob = llm_outcome_to_prob(llm_outcome, llm_confidence)
-    if llm_prob is not None:
-        probs.append(llm_prob)
-        labels.append(1 if llm_prob >= 0.5 else 0)
+    if llm_label is not None:
+        labels.append(llm_label)
         used.append("llm_forecast")
 
     if classifier and classifier.get("available") and classifier.get("win_probability") is not None:
         cp = float(classifier["win_probability"])
-        probs.append(cp)
+        grounded.append((cp, 2.0))
         labels.append(1 if cp >= 0.5 else 0)
         used.append("classifier")
 
     n = len(labels)
-    if n == 0:
+    if not grounded:
         return {
             "final_win_probability": None,
             "final_label": None,
-            "agreement": "none",
+            "agreement": "insufficient" if n else "none",
             "confidence": "low",
-            "signals_used": [],
-            "note": "No appeal-shaped signal available; treat as a non-verdict situation.",
+            "signals_used": used,
+            "note": (
+                "No decided analogous precedent or classifier signal was available, "
+                "so no percentage is shown; the notes below rest on the written "
+                "analysis alone and should be treated as tentative."
+            ),
         }
 
-    agree = all(l == labels[0] for l in labels)
-    final_prob = round(sum(probs) / n, 3)
+    wsum = sum(w for _, w in grounded)
+    final_prob = round(sum(pr * w for pr, w in grounded) / wsum, 3)
     final_label = 1 if final_prob >= 0.5 else 0
+
+    agree = len(set(labels)) == 1
     agreement = "single" if n == 1 else ("high" if agree else "mixed")
 
     note = None
-    if llm_label is None and used:
+    if llm_label is None:
         note = (
-            "The reasoning model did not give a binary verdict (likely a "
-            "non-appellate situation); the figure below reflects how analogous "
-            "past cases were decided, not a predicted verdict."
+            "The written analysis did not commit to a win/lose verdict; the figure "
+            "reflects how analogous past cases were decided, not a predicted verdict."
+        )
+    elif not agree:
+        note = (
+            "The independent signals do not fully agree, so confidence is held low "
+            "and the estimate should be read with caution."
         )
 
     return {
         "final_win_probability": final_prob,
         "final_label": final_label,
         "agreement": agreement,
-        "confidence": _confidence(n, agree),
+        "confidence": _confidence(n, agree, final_prob, precedent),
         "signals_used": used,
         "note": note,
     }
